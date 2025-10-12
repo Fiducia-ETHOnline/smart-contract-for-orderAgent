@@ -33,7 +33,9 @@ contract OrderContract {
     uint256 private constant HOLD_UNTIL = 600; // Time in seconds to hold the order. Adjust as needed.
     uint64 private offerID = 0; // Counter for offer IDs
     address private immutable agentController; // Address of the agent controller
+    address private immutable pyUSD; // Address of the pyUSD token contract
     mapping(address => mapping(uint64 offerId => bytes32 promptHash)) public addressToOfferIdToPromptHash;
+
 
     modifier onlyAgentController() {
         // Placeholder for access control logic
@@ -43,13 +45,16 @@ contract OrderContract {
         _;
         
     }
-    constructor(address agentControllerAddress) {
+    constructor(address agentControllerAddress, address pyUSDAddress) {
         // Initialization logic if needed
         agentController = agentControllerAddress;
+        pyUSD = pyUSDAddress;
     }
-    function proposeOrder(uint64 agentId, uint256 amountForCompute, bytes32 promptHash) public returns(uint64 offerId) {
+    function proposeOrder(uint256 amountForCompute, bytes32 promptHash) public returns(uint64 offerId) {
         // Increment the offer ID counter
         offerID++;
+        //payComputeFeeToAgentController(amountForCompute);
+        ERC20(pyUSD).transferFrom(msg.sender, agentController, amountForCompute);
         // Store the prompt hash associated with the sender's address and the new offer ID
         addressToOfferIdToPromptHash[msg.sender][offerID] = promptHash;
         // Return the new offer ID
