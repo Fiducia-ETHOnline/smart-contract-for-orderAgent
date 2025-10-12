@@ -28,6 +28,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract OrderContract {
     /* errors */
     error notAgentController();
+    error ERC20TransferFailed();
     /* state variables */
     uint256 private constant AGENT_FEE = 1 ether; // Fee for agent services. Adjust as needed.
     uint256 private constant HOLD_UNTIL = 600; // Time in seconds to hold the order. Adjust as needed.
@@ -50,16 +51,23 @@ contract OrderContract {
         agentController = agentControllerAddress;
         pyUSD = pyUSDAddress;
     }
-    function proposeOrder(uint256 amountForCompute, bytes32 promptHash) public returns(uint64 offerId) {
+    function proposeOrder(uint256 amountForCompute, bytes32 promptHash) external returns(uint64 offerId) {
         // Increment the offer ID counter
         offerID++;
         //payComputeFeeToAgentController(amountForCompute);
-        ERC20(pyUSD).transferFrom(msg.sender, agentController, amountForCompute);
+        bool success= ERC20(pyUSD).transferFrom(msg.sender, agentController, amountForCompute);
+        if (!success) {
+            revert ERC20TransferFailed();
+        }
         // Store the prompt hash associated with the sender's address and the new offer ID
         addressToOfferIdToPromptHash[msg.sender][offerID] = promptHash;
         // Return the new offer ID
         return offerID;
         
     }
+
+
+
+
 
 }
