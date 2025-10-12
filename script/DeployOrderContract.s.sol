@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.18;
 
-import {OrderContract} from "../src/orderContract.sol";
+import {OrderContract} from "../src/OrderContract.sol";
 import {Script} from "forge-std/Script.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
 

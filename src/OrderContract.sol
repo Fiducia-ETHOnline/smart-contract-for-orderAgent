@@ -42,8 +42,10 @@ contract OrderContract is ReentrancyGuard{
     mapping(uint64 offerID => mapping(address user => uint256 amountPaid)) private offerIdToUserToAmountPaid;
 
     /* events */
-    event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 promptHash, uint256 amountForCompute);
+    event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash, uint256 amountForCompute);
     event OrderConfirmed(address indexed user, uint64 indexed offerId, uint256 indexed amountPaid);
+    
+    /* modifiers */
     modifier onlyAgentController() {
         // Placeholder for access control logic
         if (msg.sender != agentController) {
@@ -96,7 +98,20 @@ contract OrderContract is ReentrancyGuard{
         
     }
 
+    /* getter functions */
+    function getPromptHash(address user, uint64 offerId) external view returns (bytes32) {
+        return addressToOfferIdToPromptHash[user][offerId];
+    }
     
+    function getAmountPaid(uint64 offerId, address user) external view returns (uint256) {
+        return offerIdToUserToAmountPaid[offerId][user];
+    }
+
+    function getAgentController() external view returns (address) {
+        return agentController;
+    }
+
+
 
 
 
