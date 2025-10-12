@@ -15,7 +15,7 @@ contract DeployOrderContract is Script {
         (address pyUSD, address agentController, uint256 deployerKey )= helperConfig.activeNetworkConfig();
         vm.startBroadcast(deployerKey);
         OrderContract orderContract = new OrderContract(
-        pyUSD, agentController  // Replace with actual pyUSD token address
+        agentController,  pyUSD // Replace with actual pyUSD token address
         );
         vm.stopBroadcast();
         return (orderContract, helperConfig);

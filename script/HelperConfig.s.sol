@@ -33,7 +33,7 @@ contract HelperConfig is Script {
         vm.stopBroadcast();
         return NetworkConfig({
             pyUSD: address(pyUSD),
-            agentController: msg.sender,
+            agentController: address(5),
             deployerKey: vm.envUint("PRIVATE_KEY")
         });
     
