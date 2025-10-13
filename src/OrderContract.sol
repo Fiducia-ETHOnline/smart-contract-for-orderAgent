@@ -55,7 +55,7 @@ contract OrderContract is ReentrancyGuard{
     mapping(uint64 offerId => mapping(address user => uint256 amountPaid)) private offerIdToUserToAmountPaid;
     mapping(uint64 offerId => OrderStatus status) private offerIdToStatus;
     mapping(uint64 offerId => bytes32 answerHash) private offerIdToAnswerHash;
-
+    mapping(uint64 => address) private offerIdToUser;
     /* events */
     event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash);
     event OrderConfirmed(address indexed user, uint64 indexed offerId, uint256 indexed amountPaid);
@@ -87,6 +87,7 @@ contract OrderContract is ReentrancyGuard{
 
         offerIdToStatus[offerID] = OrderStatus.InProgress;
         addressToOfferIdToPromptHash[msg.sender][offerID] = promptHash;
+        offerIdToUser[offerID] = msg.sender;
         emit OrderProposed(msg.sender, offerID, promptHash);
         
         return offerID;
@@ -127,8 +128,8 @@ contract OrderContract is ReentrancyGuard{
         }
         offerIdToStatus[offerId] = OrderStatus.Completed;
         uint256 amountPaid = offerIdToUserToAmountPaid[offerId][msg.sender];
-        emit orderFinalized(msg.sender, offerId);
-        bool success = ERC20(pyUSD).transfer(msg.sender, amountPaid - AGENT_FEE);
+        emit orderFinalized(getUserByOfferId(offerId), offerId);
+        bool success = ERC20(pyUSD).transfer(getUserByOfferId(offerId), amountPaid - AGENT_FEE);
         if (!success) {
             revert OrderContract__ERC20TransferFailed();
         }
@@ -176,7 +177,9 @@ contract OrderContract is ReentrancyGuard{
 
 
 
-
+    function getUserByOfferId(uint64 offerId) public view returns (address) {
+        return offerIdToUser[offerId];
+    }
 
 
 
