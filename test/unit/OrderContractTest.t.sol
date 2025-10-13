@@ -230,4 +230,28 @@ contract OrderContractTest is Test {
     }
 
 
+
+
+    //////////////////////////////////////
+    //        Getter function tests       //
+    //////////////////////////////////////
+
+    function testGetAgentFee() public view {
+        // Arrange
+        uint256 expectedAgentFee = 1 ether; // AGENT_FEE is set to 1 ether in the contract
+        // Act
+        uint256 agentFee = orderContract.getAgentFee();
+        // Assert
+        assertEq(agentFee, expectedAgentFee);
+    }
+
+    function testGetAgentController() public view {
+        // Arrange
+        address expectedController = addressController;
+        // Act
+        address controller = orderContract.getAgentController();
+        // Assert
+        assertEq(controller, expectedController);
+    }
+
 }
