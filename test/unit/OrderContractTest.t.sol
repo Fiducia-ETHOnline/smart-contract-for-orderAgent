@@ -87,7 +87,7 @@ contract OrderContractTest is Test {
         uint256 priceForOffer = 5 ether;
         // Act / Assert
         vm.prank(address(0x123));
-        vm.expectRevert(OrderContract.userHasNoAccessToOffer.selector);
+        vm.expectRevert(OrderContract.OrderContract__userHasNoAccessToOffer.selector);
         orderContract.confirmOrder(offerId, priceForOffer);   
     
     }

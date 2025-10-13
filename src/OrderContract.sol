@@ -28,10 +28,13 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 contract OrderContract is ReentrancyGuard{
     /* errors */
-    error notAgentController();
-    error ERC20TransferFailed();
-    error userHasNoAccessToOffer();
-    error OrderCannotBeConfirmedInCurrentState();
+    error OrderContract__notAgentController();
+    error OrderContract__ERC20TransferFailed();
+    error OrderContract__userHasNoAccessToOffer();
+    error OrderContract__OrderCannotBeConfirmedInCurrentState();
+    error OrderContract__OrderCannotBeCanceledInCurrentState();
+    error OrderContract__OrderCannotBeFinalizedInCurrentState();
+    error OrderContract__EnoughTimeHasNotPassed();
 
     /* type declarations */
     enum OrderStatus {
@@ -56,19 +59,19 @@ contract OrderContract is ReentrancyGuard{
     /* events */
     event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash);
     event OrderConfirmed(address indexed user, uint64 indexed offerId, uint256 indexed amountPaid);
-    
+    event orderFinalized(address indexed user, uint64 indexed offerId);
     /* modifiers */
     modifier onlyAgentController() {
         // Placeholder for access control logic
         if (msg.sender != agentController) {
-            revert notAgentController();
+            revert OrderContract__notAgentController();
         }
         _;
     }
     modifier onlyUserWithOffer(uint64 offerId) {
         // Ensure the caller has a valid offer
         if (addressToOfferIdToPromptHash[msg.sender][offerId] == bytes32(0)) {
-            revert userHasNoAccessToOffer();
+            revert OrderContract__userHasNoAccessToOffer();
         }
         _;
         
@@ -94,7 +97,7 @@ contract OrderContract is ReentrancyGuard{
 
     function confirmOrder(uint64 offerId, uint256 priceForOffer) external nonReentrant onlyUserWithOffer(offerId) {
         if ( offerIdToStatus[offerId] != OrderStatus.Proposed) {
-            revert OrderCannotBeConfirmedInCurrentState();
+            revert OrderContract__OrderCannotBeConfirmedInCurrentState();
         }
         // update amount paid for the offer by the user
         uint256 amountToPay = priceForOffer + AGENT_FEE;
@@ -105,7 +108,7 @@ contract OrderContract is ReentrancyGuard{
         bool success= ERC20(pyUSD).transferFrom(msg.sender, address(this), priceForOffer + AGENT_FEE);
         
         if (!success) {
-            revert ERC20TransferFailed();
+            revert OrderContract__ERC20TransferFailed();
         }
         emit OrderConfirmed(msg.sender, offerId, amountToPay);
         
@@ -118,15 +121,33 @@ contract OrderContract is ReentrancyGuard{
         offerIdToStatus[offerId] = OrderStatus.Proposed;
     }
 
-    function finalizeBooking (uint64 offerId) external onlyAgentController {
+    function finalizeOrder (uint64 offerId) external onlyAgentController returns(bool){
         if (offerIdToStatus[offerId] != OrderStatus.Confirmed) {
-            revert OrderCannotBeConfirmedInCurrentState();
+            revert OrderContract__OrderCannotBeFinalizedInCurrentState();
         }
         offerIdToStatus[offerId] = OrderStatus.Completed;
         uint256 amountPaid = offerIdToUserToAmountPaid[offerId][msg.sender];
+        emit orderFinalized(msg.sender, offerId);
         bool success = ERC20(pyUSD).transfer(msg.sender, amountPaid - AGENT_FEE);
         if (!success) {
-            revert ERC20TransferFailed();
+            revert OrderContract__ERC20TransferFailed();
+        }
+
+        return true;
+
+    }
+
+    function cancelOrder() external onlyUserWithOffer(offerID) {
+        if (block.timestamp - offerIdToTimestamp[offerID] < HOLD_UNTIL) {
+            revert OrderContract__EnoughTimeHasNotPassed();
+        }
+        if (offerIdToStatus[offerID] != OrderStatus.Confirmed) {
+            revert OrderContract__OrderCannotBeCanceledInCurrentState();
+        }
+        offerIdToStatus[offerID] = OrderStatus.Cancelled;
+        bool success = ERC20(pyUSD).transfer(msg.sender, offerIdToUserToAmountPaid[offerID][msg.sender]);
+        if (!success) {
+            revert OrderContract__ERC20TransferFailed();
         }
     }
 
@@ -152,9 +173,6 @@ contract OrderContract is ReentrancyGuard{
     function getOfferIdToTimestamp(uint64 offerId) external view returns (uint256) {
         return offerIdToTimestamp[offerId];
     }
-
-
-
 
 
 
