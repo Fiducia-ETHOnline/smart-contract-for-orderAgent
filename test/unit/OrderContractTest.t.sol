@@ -19,7 +19,8 @@ contract OrderContractTest is Test {
 
     address public USER = makeAddr("user");
 
-    event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash, uint256 amountForCompute);
+    event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash);
+    event OrderConfirmed(address indexed user, uint64 indexed offerId, uint256 indexed amountPaid);
 
 
     function setUp() public {
@@ -39,7 +40,7 @@ contract OrderContractTest is Test {
 
         vm.startPrank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
-        uint64 offerId = orderContract.proposeOrder(amountForCompute, promptHash);
+        uint64 offerId = orderContract.proposeOrder(promptHash);
         vm.stopPrank();
         // Assert
         bytes32 storedPromptHash = orderContract.getPromptHash(USER, offerId);
@@ -53,10 +54,10 @@ contract OrderContractTest is Test {
         vm.startPrank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
         // Expect
-        vm.expectEmit(true, true, true, true, address(orderContract));
-        emit OrderProposed(USER, 1, promptHash, amountForCompute);
+        vm.expectEmit(true, true, true, false, address(orderContract));
+        emit OrderProposed(USER, 1, promptHash);
         // Act
-        orderContract.proposeOrder(amountForCompute, promptHash);
+        orderContract.proposeOrder(promptHash);
         vm.stopPrank();
     }
 
@@ -68,13 +69,19 @@ contract OrderContractTest is Test {
     modifier proposeOrderForUser() {
         vm.startPrank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
-        orderContract.proposeOrder(amountForCompute, promptHash);
+        orderContract.proposeOrder(promptHash);
         vm.stopPrank();
         _;
         
     }
 
-    function testOnlyUserWithOfferCanConfirmOrder() public proposeOrderForUser {
+    modifier orderProposedAnsweredByAgent(uint64 offerId, bytes32 answerHash) {
+        vm.prank(addressController);
+        orderContract.proposeOrderAnswer(answerHash, offerId);
+        _;
+    }
+
+    function testOnlyUserWithOfferCanConfirmOrder() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
         // Arrange
         uint64 offerId = 1;
         uint256 priceForOffer = 5 ether;
@@ -85,6 +92,38 @@ contract OrderContractTest is Test {
     
     }
 
+    function testConfirmOrderUpdatesAmountPaidAndTimeStamp() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
+        // Arrange
+        uint64 offerId = 1;
+        uint256 priceForOffer = 5 ether;
+        uint256 expectedAmountPaid = priceForOffer + orderContract.getAgentFee(); // AGENT_FEE i 1 ether
+        uint256 expectedTimeStamp = block.timestamp;
+        // Act
+        vm.startPrank(USER);
+        ERC20Mock(pyUSD).approve(address(orderContract), expectedAmountPaid);
+        orderContract.confirmOrder(offerId, priceForOffer);
+        vm.stopPrank();
+        // Assert
+        uint256 amountPaid = orderContract.getAmountPaid(offerId, USER);
+        assertEq(amountPaid, expectedAmountPaid);
+        assertEq(orderContract.getOfferIdToTimestamp(offerId), expectedTimeStamp);
+    }
     
+    function testConfirmOrderEmitsEvent() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))){
+        // Arrange
+        uint64 offerId = 1;
+        uint256 priceForOffer = 5 ether;
+        uint256 expectedAmountPaid = priceForOffer + orderContract.getAgentFee(); // AGENT_FEE is 1 ether
+        
+       
+        // Act
+        vm.startPrank(USER);
+        ERC20Mock(pyUSD).approve(address(orderContract), expectedAmountPaid);
+        vm.expectEmit(true, true, true, false, address(orderContract));
+        emit OrderConfirmed(USER, offerId, expectedAmountPaid);
+        orderContract.confirmOrder(offerId, priceForOffer);
+        vm.stopPrank();
+    }
+
 
 }
