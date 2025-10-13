@@ -138,14 +138,14 @@ contract OrderContract is ReentrancyGuard{
 
     }
 
-    function cancelOrder() external onlyUserWithOffer(offerID) {
-        if (block.timestamp - offerIdToTimestamp[offerID] < HOLD_UNTIL) {
+    function cancelOrder(uint64 offerId) external onlyUserWithOffer(offerID) {
+        if (block.timestamp - offerIdToTimestamp[offerId] < HOLD_UNTIL) {
             revert OrderContract__EnoughTimeHasNotPassed();
         }
-        if (offerIdToStatus[offerID] != OrderStatus.Confirmed) {
+        if (offerIdToStatus[offerId] != OrderStatus.Confirmed) {
             revert OrderContract__OrderCannotBeCanceledInCurrentState();
         }
-        offerIdToStatus[offerID] = OrderStatus.Cancelled;
+        offerIdToStatus[offerId] = OrderStatus.Cancelled;
         bool success = ERC20(pyUSD).transfer(msg.sender, offerIdToUserToAmountPaid[offerID][msg.sender]);
         if (!success) {
             revert OrderContract__ERC20TransferFailed();
