@@ -118,12 +118,12 @@ contract OrderContract is ReentrancyGuard{
 
 
 
-    function confirmOrder(uint64 offerId, uint256 priceForOffer) external nonReentrant onlyUserWithOffer(offerId) {
+    function confirmOrder(uint64 offerId) external nonReentrant onlyUserWithOffer(offerId) {
         if ( offers[offerId].status != OrderStatus.Proposed) {
             revert OrderContract__OrderCannotBeConfirmedInCurrentState();
         }
         // update amount paid for the offer by the user
-        uint256 amountToPay = priceForOffer + AGENT_FEE;
+        uint256 amountToPay = offers[offerId].price + AGENT_FEE;
         // offerIdToUserToAmountPaid[offerId][msg.sender] += amountToPay;
         // offerIdToStatus[offerId] = OrderStatus.Confirmed;
         offers[offerId].paid = amountToPay;
@@ -142,7 +142,7 @@ contract OrderContract is ReentrancyGuard{
 
 
     // Save answer from propose order. Answer will be the proposed order. Set orderStatus to proposed.
-    function proposeOrderAnswer(bytes32 answerHash, uint64 offerId) external onlyAgentController {
+    function proposeOrderAnswer(bytes32 answerHash, uint64 offerId, uint256 priceForOffer) external onlyAgentController {
         if (offers[offerId].status != OrderStatus.InProgress) {
             revert OrderContract__CannotProposeOrderAnswerInCurrentState();
         }
@@ -150,6 +150,7 @@ contract OrderContract is ReentrancyGuard{
         // offerIdToStatus[offerId] = OrderStatus.Proposed;
         offers[offerId].answerHash = answerHash;
         offers[offerId].status = OrderStatus.Proposed;
+        offers[offerId].price = priceForOffer;
     }
 
     function finalizeOrder (uint64 offerId) external onlyAgentController returns(bool){

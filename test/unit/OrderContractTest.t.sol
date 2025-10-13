@@ -221,6 +221,17 @@ contract OrderContractTest is Test {
         _;
     }
 
+    modifier multipleProposeOrderAnswer() {
+        uint256 numberOfUsers = 10;
+        bytes32 answerHash = keccak256(abi.encodePacked("Test Answer"));
+        for (uint256 i = 0; i < numberOfUsers; i++) {
+            uint64 offerId = uint64(i + 1);
+            vm.prank(addressController);
+            orderContract.proposeOrderAnswer(answerHash, offerId);   
+        }
+        _;
+    }
+
     function testMultipleUserProposeOrder() public {
         // Arrange
         uint256 numberOfUsers = 10;
@@ -278,7 +289,7 @@ contract OrderContractTest is Test {
         }
     }
 
-    function testMulitpleCanFinalizeOrder
+    function testMulitpleCanFinalizeOrder() public 
 
 
 }
