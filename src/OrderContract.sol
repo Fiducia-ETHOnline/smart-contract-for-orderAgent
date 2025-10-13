@@ -153,7 +153,7 @@ contract OrderContract is ReentrancyGuard{
         offers[offerId].price = priceForOffer;
     }
 
-    function finalizeOrder (uint64 offerId) external onlyAgentController returns(bool){
+    function finalizeOrder (uint64 offerId) external onlyAgentController nonReentrant returns(bool){
         if (offers[offerId].status != OrderStatus.Confirmed) {
             revert OrderContract__OrderCannotBeFinalizedInCurrentState();
         }
@@ -170,7 +170,7 @@ contract OrderContract is ReentrancyGuard{
 
     }
 
-    function cancelOrder(uint64 offerId) external onlyUserWithOffer(offerID) {
+    function cancelOrder(uint64 offerId) external nonReentrant onlyUserWithOffer(offerID) {
         if (block.timestamp - offers[offerId].timestamp < HOLD_UNTIL) {
             revert OrderContract__EnoughTimeHasNotPassed();
         }

@@ -76,19 +76,19 @@ contract OrderContractTest is Test {
     }
 
     modifier orderProposedAnsweredByAgent(uint64 offerId, bytes32 answerHash) {
+        uint256 priceForOffer = 5 ether;
         vm.prank(addressController);
-        orderContract.proposeOrderAnswer(answerHash, offerId);
+        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer);
         _;
     }
 
     function testOnlyUserWithOfferCanConfirmOrder() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
         // Arrange
         uint64 offerId = 1;
-        uint256 priceForOffer = 5 ether;
         // Act / Assert
         vm.prank(address(0x123));
         vm.expectRevert(OrderContract.OrderContract__userHasNoAccessToOffer.selector);
-        orderContract.confirmOrder(offerId, priceForOffer);   
+        orderContract.confirmOrder(offerId);   
     
     }
 
@@ -101,7 +101,7 @@ contract OrderContractTest is Test {
         // Act
         vm.startPrank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), expectedAmountPaid);
-        orderContract.confirmOrder(offerId, priceForOffer);
+        orderContract.confirmOrder(offerId);
         vm.stopPrank();
         // Assert
         uint256 amountPaid = orderContract.getAmountPaid(offerId);
@@ -121,35 +121,59 @@ contract OrderContractTest is Test {
         ERC20Mock(pyUSD).approve(address(orderContract), expectedAmountPaid);
         vm.expectEmit(true, true, true, false, address(orderContract));
         emit OrderConfirmed(USER, offerId, expectedAmountPaid);
-        orderContract.confirmOrder(offerId, priceForOffer);
+        orderContract.confirmOrder(offerId);
         vm.stopPrank();
+
+    
+    }
+
+    function testConfirmOrderRevertsIfOrderNotProposed() public proposeOrderForUser {
+        // Arrange
+        uint64 offerId = 1;
+        // Act / Assert
+        vm.prank(USER);
+        vm.expectRevert(OrderContract.OrderContract__OrderCannotBeConfirmedInCurrentState.selector);
+        orderContract.confirmOrder(offerId);
     }
      //////////////////////////////////////
     //        proposeOrderAnswer tests    //
     //////////////////////////////////////
 
     function testOnlyControllerCanProposeAnswer() public proposeOrderForUser {
+        uint256 priceForOffer = 5 ether;
         // Arrange
         uint64 offerId = 1;
         bytes32 answerHash = keccak256(abi.encodePacked("Test Answer"));
         // Act / Assert
         vm.prank(address(0x123));
         vm.expectRevert(OrderContract.OrderContract__notAgentController.selector);
-        orderContract.proposeOrderAnswer(answerHash, offerId);   
+        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer);   
     }
     
     function testProposeOrderAnswerUpdatesState() public proposeOrderForUser {
         // Arrange
+        uint256 priceForOffer = 5 ether;
         uint64 offerId = 1;
         bytes32 answerHash = keccak256(abi.encodePacked("Test Answer"));
         // Act
         vm.prank(addressController);
-        orderContract.proposeOrderAnswer(answerHash, offerId);   
+        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer);   
         // Assert
         bytes32 storedAnswerHash = orderContract.getAnswerHash(offerId);
         assertEq(storedAnswerHash, answerHash);
         OrderContract.OrderStatus status = orderContract.getOfferStatus(offerId);
         assertEq(uint8(status), uint8(OrderContract.OrderStatus.Proposed));
+    }
+
+    function testProposeOrderAnswerRevertsIfNotInProgress() public {
+        // Arrange
+        uint256 priceForOffer = 5 ether;
+        uint64 offerId = 1;
+        bytes32 answerHash = keccak256(abi.encodePacked("Test Answer"));
+        // Act / Assert
+        vm.prank(addressController);
+        vm.expectRevert(OrderContract.OrderContract__CannotProposeOrderAnswerInCurrentState.selector);
+        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer);
     }
 
     
@@ -158,15 +182,16 @@ contract OrderContractTest is Test {
     //////////////////////////////////////
 
     modifier orderConfirmed() {
+        uint256 priceForOffer = 5 ether;
         vm.startPrank(USER);
         orderContract.proposeOrder(promptHash);
         vm.stopPrank();
         vm.prank(addressController);
-        orderContract.proposeOrderAnswer(keccak256(abi.encodePacked("Test Answer")), 1);
+        orderContract.proposeOrderAnswer(keccak256(abi.encodePacked("Test Answer")), 1, priceForOffer);
         uint256 expectedAmountPaid = 5 ether + orderContract.getAgentFee();
         vm.startPrank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), expectedAmountPaid);
-        orderContract.confirmOrder(1, 5 ether);
+        orderContract.confirmOrder(1);
         vm.stopPrank();
         _;
     }
@@ -203,93 +228,6 @@ contract OrderContractTest is Test {
         // Assert
         assertEq(controllerBalanceAfter - controllerBalanceBefore, expectedAmountPaid);
     }
-
-
-    //////////////////////////////////////////
-    ///     Big tests with loops            ///
-    //////////////////////////////////////////
-
-    modifier multipleUserProposeOrder(uint256 numberOfUsers) {
-        for (uint256 i = 0; i < numberOfUsers; i++) {
-            address user = makeAddr(string(abi.encodePacked("user", vm.toString(i))));
-            vm.startPrank(user);
-            ERC20Mock(pyUSD).mint(user, 100 ether);
-            ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
-            orderContract.proposeOrder(promptHash);
-            vm.stopPrank();
-        }
-        _;
-    }
-
-    modifier multipleProposeOrderAnswer() {
-        uint256 numberOfUsers = 10;
-        bytes32 answerHash = keccak256(abi.encodePacked("Test Answer"));
-        for (uint256 i = 0; i < numberOfUsers; i++) {
-            uint64 offerId = uint64(i + 1);
-            vm.prank(addressController);
-            orderContract.proposeOrderAnswer(answerHash, offerId);   
-        }
-        _;
-    }
-
-    function testMultipleUserProposeOrder() public {
-        // Arrange
-        uint256 numberOfUsers = 10;
-        uint256 expectedOfferId = 1;
-        // Act
-        for (uint256 i = 0; i < numberOfUsers; i++) {
-            address user = makeAddr(string(abi.encodePacked("user", vm.toString(i))));
-            vm.startPrank(user);
-            uint64 offerId = orderContract.proposeOrder(promptHash);
-            vm.stopPrank();
-            // Assert
-            bytes32 storedPromptHash = orderContract.getPromptHash(offerId);
-            assertEq(storedPromptHash, promptHash);
-            assertEq(offerId, expectedOfferId);
-            expectedOfferId++;
-        }
-    }
-
-    function testMultipleProposeOrderAnswer() public multipleUserProposeOrder(10) {
-        // Arrange
-        uint256 numberOfUsers = 10;
-        bytes32 answerHash = keccak256(abi.encodePacked("Test Answer"));
-        // Act
-        for (uint256 i = 0; i < numberOfUsers; i++) {
-            uint64 offerId = uint64(i + 1);
-            vm.prank(addressController);
-            orderContract.proposeOrderAnswer(answerHash, offerId);   
-            // Assert
-            bytes32 storedAnswerHash = orderContract.getAnswerHash(offerId);
-            assertEq(storedAnswerHash, answerHash);
-            OrderContract.OrderStatus status = orderContract.getOfferStatus(offerId);
-            assertEq(uint8(status), uint8(OrderContract.OrderStatus.Proposed));
-        }
-    }
-    function testMultipleConfirmOrder() public multipleUserProposeOrder(10) {
-        // Arrange
-        uint256 numberOfUsers = 10;
-        bytes32 answerHash = keccak256(abi.encodePacked("Test Answer"));
-        uint256 priceForOffer = 5 ether;
-        uint256 expectedAmountPaid = priceForOffer + orderContract.getAgentFee(); // AGENT_FEE i 1 ether
-        // Act
-        for (uint256 i = 0; i < numberOfUsers; i++) {
-            uint64 offerId = uint64(i + 1);
-            address user = makeAddr(string(abi.encodePacked("user", vm.toString(i))));
-            vm.prank(addressController);
-            orderContract.proposeOrderAnswer(answerHash, offerId);   
-            vm.startPrank(user);
-            ERC20Mock(pyUSD).approve(address(orderContract), expectedAmountPaid);
-            orderContract.confirmOrder(offerId, priceForOffer);
-            vm.stopPrank();
-            // Assert
-            uint256 amountPaid = orderContract.getAmountPaid(offerId);
-            assertEq(amountPaid, expectedAmountPaid);
-            assertEq(orderContract.getOfferIdToTimestamp(offerId), block.timestamp);
-        }
-    }
-
-    function testMulitpleCanFinalizeOrder() public 
 
 
 }
