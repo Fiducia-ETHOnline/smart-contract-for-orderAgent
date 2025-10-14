@@ -260,7 +260,10 @@ contract OrderContract is ReentrancyGuard{
      * @return OrderStatus of the specified order
      */
     function getUserOrderStatus(address user, uint64 orderId) external view returns (OrderStatus) {
-        require(userOrders[user][orderId], "Order does not belong to user");
+        if (offers[orderId].buyer != user) {
+            revert OrderContract__userHasNoAccessToOffer();
+        }
+        // require(userOrders[user][orderId], "Order does not belong to user");
         return offers[orderId].status;
     }
     
