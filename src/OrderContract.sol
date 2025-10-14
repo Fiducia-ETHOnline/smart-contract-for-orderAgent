@@ -48,6 +48,7 @@ contract OrderContract is ReentrancyGuard{
 
     struct Offer {
         address buyer;
+        address seller;
         bytes32 promptHash;
         bytes32 answerHash;
         uint256 price; 
@@ -78,6 +79,10 @@ contract OrderContract is ReentrancyGuard{
     // User order tracking mappings
     mapping(address => mapping(uint64 => bool)) private userOrders;
     mapping(address => uint64[]) private userOrderIds;
+
+    // merchants address->orderIds mapping to fetch all orders for a merchant
+    mapping(address => uint64[]) private merchantOrderIds;
+
     
     /* events */
     event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash);
@@ -152,7 +157,7 @@ contract OrderContract is ReentrancyGuard{
 
 
     // Save answer from propose order. Answer will be the proposed order. Set orderStatus to proposed.
-    function proposeOrderAnswer(bytes32 answerHash, uint64 offerId, uint256 priceForOffer) external onlyAgentController {
+    function proposeOrderAnswer(bytes32 answerHash, uint64 offerId, uint256 priceForOffer, address seller) external onlyAgentController {
         if (offers[offerId].status != OrderStatus.InProgress) {
             revert OrderContract__CannotProposeOrderAnswerInCurrentState();
         }
@@ -161,6 +166,8 @@ contract OrderContract is ReentrancyGuard{
         offers[offerId].answerHash = answerHash;
         offers[offerId].status = OrderStatus.Proposed;
         offers[offerId].price = priceForOffer;
+        offers[offerId].seller = seller;
+        merchantOrderIds[seller].push(offerId);
     }
 
     function finalizeOrder(uint64 offerId) external onlyAgentController nonReentrant returns(bool){
@@ -171,7 +178,7 @@ contract OrderContract is ReentrancyGuard{
         offers[offerId].status = OrderStatus.Completed;
         uint256 amountPaid = offers[offerId].paid;
         emit orderFinalized(getUserByOfferId(offerId), offerId);
-        bool success = ERC20(pyUSD).transfer(agentController, amountPaid);
+        bool success = ERC20(pyUSD).transfer(offers[offerId].seller, amountPaid);
         if (!success) {
             revert OrderContract__ERC20TransferFailed();
         }
