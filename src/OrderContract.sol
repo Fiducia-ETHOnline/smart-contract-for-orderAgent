@@ -103,7 +103,7 @@ contract OrderContract is ReentrancyGuard{
         
         // Increment the offer ID counter
         offerID++;
-
+        
         // offerIdToStatus[offerID] = OrderStatus.InProgress;
         offers[offerID].status = OrderStatus.InProgress;
         offers[offerID].buyer = msg.sender;
@@ -153,7 +153,7 @@ contract OrderContract is ReentrancyGuard{
         offers[offerId].price = priceForOffer;
     }
 
-    function finalizeOrder (uint64 offerId) external onlyAgentController nonReentrant returns(bool){
+    function finalizeOrder(uint64 offerId) external onlyAgentController nonReentrant returns(bool){
         if (offers[offerId].status != OrderStatus.Confirmed) {
             revert OrderContract__OrderCannotBeFinalizedInCurrentState();
         }
