@@ -7,17 +7,20 @@ import {OrderContract} from "../../src/OrderContract.sol";
 import {HelperConfig} from "script/HelperConfig.s.sol";
 import {DeployOrderContract} from "script/DeployOrderContract.s.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+import {A3AToken} from "../../src/A3Atoken.sol";
 
 contract OrderContractTest is Test {
     OrderContract orderContract;
     HelperConfig helperConfig;
     address pyUSD;
     address addressController;
+    A3AToken a3aToken;
 
     uint256 constant amountForCompute = 10 ether;
     bytes32 constant promptHash = keccak256(abi.encodePacked("Test Prompt"));
 
     address public USER = makeAddr("user");
+    address public USER2 = makeAddr("user2");
     address public SELLER = makeAddr("seller");
 
     event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash);
@@ -26,14 +29,45 @@ contract OrderContractTest is Test {
 
     function setUp() public {
         DeployOrderContract deployer = new DeployOrderContract();
-        (orderContract, helperConfig) = deployer.run();
+        (orderContract, helperConfig, a3aToken) = deployer.run();
         (pyUSD, addressController, ) = helperConfig.activeNetworkConfig();
         ERC20Mock(pyUSD).mint(USER, 100 ether);
+        ERC20Mock(pyUSD).mint(USER2, 100 ether);
+
+        // approve the orderContract to spend USERs A3A tokens so no need to approve every time in tests
+        vm.prank(USER);
+        a3aToken.approve(address(orderContract), type(uint256).max);
+        // buy A3A tokens for USER so tests work
+        vm.startPrank(USER);
+        ERC20Mock(pyUSD).approve(address(orderContract), 10e6);
+        orderContract.buyA3AToken(10e6);
+        vm.stopPrank();
+        
+
                 
+    }
+      //////////////////////////////////////
+    //        Buy A3A tests               //
+    //////////////////////////////////////
+    function testBuyA3AToken() public {
+        
+        // Arrange
+        uint256 amountToBuy = 10e6;
+        uint256 expectedBalanceOfA3A = 100 ether;
+        // Act
+        vm.startPrank(USER2);
+        ERC20Mock(pyUSD).approve(address(orderContract), amountToBuy);
+        orderContract.buyA3AToken(amountToBuy);
+        vm.stopPrank();
+        // Assert
+        uint256 userBalanceAfter = a3aToken.balanceOf(USER2);
+        assertEq(userBalanceAfter, expectedBalanceOfA3A);
+
     }
      //////////////////////////////////////
     //        proposeOrder tests          //
     //////////////////////////////////////
+
     function testProposeOrderUpdatesVariables() public {
         
 
@@ -239,7 +273,7 @@ contract OrderContractTest is Test {
 
     function testGetAgentFee() public view {
         // Arrange
-        uint256 expectedAgentFee = 1 ether; // AGENT_FEE is set to 1 ether in the contract
+        uint256 expectedAgentFee = 1e6; // AGENT_FEE is set to 1 ether in the contract
         // Act
         uint256 agentFee = orderContract.getAgentFee();
         // Assert
