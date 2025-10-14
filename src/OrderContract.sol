@@ -74,6 +74,11 @@ contract OrderContract is ReentrancyGuard{
     // mapping(uint64 => address) private offerIdToUser;
 
     mapping(uint64 => Offer) public offers;
+    
+    // User order tracking mappings
+    mapping(address => mapping(uint64 => bool)) private userOrders;
+    mapping(address => uint64[]) private userOrderIds;
+    
     /* events */
     event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash);
     event OrderConfirmed(address indexed user, uint64 indexed offerId, uint256 indexed amountPaid);
@@ -108,6 +113,11 @@ contract OrderContract is ReentrancyGuard{
         offers[offerID].status = OrderStatus.InProgress;
         offers[offerID].buyer = msg.sender;
         offers[offerID].promptHash = promptHash;
+        
+        // Update user order mappings
+        userOrders[msg.sender][offerID] = true;
+        userOrderIds[msg.sender].push(offerID);
+        
         // addressToOfferIdToPromptHash[msg.sender][offerID] = promptHash;
         // offerIdToUser[offerID] = msg.sender;
         emit OrderProposed(offers[offerID].buyer, offerID, offers[offerID].promptHash);
@@ -220,6 +230,93 @@ contract OrderContract is ReentrancyGuard{
     
     function getAnswerHash(uint64 offerId) external view returns (bytes32) {
         return offers[offerId].answerHash;
+    }
+
+    // User order query functions for backend integration
+    
+    /**
+     * @notice Get all order IDs for a specific user
+     * @param user The address to query orders for
+     * @return Array of order IDs belonging to the user
+     */
+    function getUserOrderIds(address user) external view returns (uint64[] memory) {
+        return userOrderIds[user];
+    }
+    
+    /**
+     * @notice Check if a user has a specific order
+     * @param user The user address
+     * @param orderId The order ID to check
+     * @return bool indicating if the user has this order
+     */
+    function hasUserOrder(address user, uint64 orderId) external view returns (bool) {
+        return userOrders[user][orderId];
+    }
+    
+    /**
+     * @notice Get the status of a specific order for a user
+     * @param user The user address
+     * @param orderId The order ID
+     * @return OrderStatus of the specified order
+     */
+    function getUserOrderStatus(address user, uint64 orderId) external view returns (OrderStatus) {
+        require(userOrders[user][orderId], "Order does not belong to user");
+        return offers[orderId].status;
+    }
+    
+    /**
+     * @notice Get all orders with their statuses for a specific user
+     * @param user The user address to query
+     * @return orderIds Array of order IDs
+     * @return statuses Array of corresponding order statuses
+     */
+    function getUserOrdersWithStatus(address user) external view returns (uint64[] memory orderIds, OrderStatus[] memory statuses) {
+        uint64[] memory userIds = userOrderIds[user];
+        OrderStatus[] memory orderStatuses = new OrderStatus[](userIds.length);
+        
+        for (uint256 i = 0; i < userIds.length; i++) {
+            orderStatuses[i] = offers[userIds[i]].status;
+        }
+        
+        return (userIds, orderStatuses);
+    }
+    
+    /**
+     * @notice Get complete order details for a user's specific order
+     * @param user The user address
+     * @param orderId The order ID
+     * @return Complete Offer struct for the specified order
+     */
+    function getUserOrderDetails(address user, uint64 orderId) external view returns (Offer memory) {
+        require(userOrders[user][orderId], "Order does not belong to user");
+        return offers[orderId];
+    }
+    
+    /**
+     * @notice Get orders filtered by status for a user
+     * @param user The user address
+     * @param status The status to filter by
+     * @return Array of order IDs matching the specified status
+     */
+    function getUserOrdersByStatus(address user, OrderStatus status) external view returns (uint64[] memory) {
+        uint64[] memory userIds = userOrderIds[user];
+        uint64[] memory filteredIds = new uint64[](userIds.length);
+        uint256 count = 0;
+        
+        for (uint256 i = 0; i < userIds.length; i++) {
+            if (offers[userIds[i]].status == status) {
+                filteredIds[count] = userIds[i];
+                count++;
+            }
+        }
+        
+        // Create a properly sized array
+        uint64[] memory result = new uint64[](count);
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = filteredIds[i];
+        }
+        
+        return result;
     }
 
 
