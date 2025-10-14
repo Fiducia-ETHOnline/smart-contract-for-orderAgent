@@ -18,6 +18,7 @@ contract OrderContractTest is Test {
     bytes32 constant promptHash = keccak256(abi.encodePacked("Test Prompt"));
 
     address public USER = makeAddr("user");
+    address public SELLER = makeAddr("seller");
 
     event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash);
     event OrderConfirmed(address indexed user, uint64 indexed offerId, uint256 indexed amountPaid);
@@ -78,7 +79,7 @@ contract OrderContractTest is Test {
     modifier orderProposedAnsweredByAgent(uint64 offerId, bytes32 answerHash) {
         uint256 priceForOffer = 5 ether;
         vm.prank(addressController);
-        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer);
+        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer, SELLER);
         _;
     }
 
@@ -147,7 +148,7 @@ contract OrderContractTest is Test {
         // Act / Assert
         vm.prank(address(0x123));
         vm.expectRevert(OrderContract.OrderContract__notAgentController.selector);
-        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer);   
+        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer, SELLER);   
     }
     
     function testProposeOrderAnswerUpdatesState() public proposeOrderForUser {
@@ -157,7 +158,7 @@ contract OrderContractTest is Test {
         bytes32 answerHash = keccak256(abi.encodePacked("Test Answer"));
         // Act
         vm.prank(addressController);
-        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer);   
+        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer, SELLER);   
         // Assert
         bytes32 storedAnswerHash = orderContract.getAnswerHash(offerId);
         assertEq(storedAnswerHash, answerHash);
@@ -173,7 +174,7 @@ contract OrderContractTest is Test {
         // Act / Assert
         vm.prank(addressController);
         vm.expectRevert(OrderContract.OrderContract__CannotProposeOrderAnswerInCurrentState.selector);
-        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer);
+        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer, SELLER);
     }
 
     
@@ -187,7 +188,7 @@ contract OrderContractTest is Test {
         orderContract.proposeOrder(promptHash);
         vm.stopPrank();
         vm.prank(addressController);
-        orderContract.proposeOrderAnswer(keccak256(abi.encodePacked("Test Answer")), 1, priceForOffer);
+        orderContract.proposeOrderAnswer(keccak256(abi.encodePacked("Test Answer")), 1, priceForOffer, SELLER);
         uint256 expectedAmountPaid = 5 ether + orderContract.getAgentFee();
         vm.startPrank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), expectedAmountPaid);
@@ -216,17 +217,17 @@ contract OrderContractTest is Test {
         assertEq(uint8(status), uint8(OrderContract.OrderStatus.Completed));
     }
 
-    function testFinalizeOrderPaysController() public orderConfirmed {
+    function testFinalizeOrderPaysMerchant() public orderConfirmed {
         // Arrange
         uint64 offerId = 1;
-        uint256 controllerBalanceBefore = ERC20Mock(pyUSD).balanceOf(addressController);
+        uint256 sellerBalanceBefore = ERC20Mock(pyUSD).balanceOf(SELLER);
         uint256 expectedAmountPaid = 5 ether + orderContract.getAgentFee();
         // Act
         vm.prank(addressController);
         orderContract.finalizeOrder(offerId);   
-        uint256 controllerBalanceAfter = ERC20Mock(pyUSD).balanceOf(addressController);
+        uint256 sellerBalanceAfter = ERC20Mock(pyUSD).balanceOf(SELLER);
         // Assert
-        assertEq(controllerBalanceAfter - controllerBalanceBefore, expectedAmountPaid);
+        assertEq(sellerBalanceAfter - sellerBalanceBefore, expectedAmountPaid);
     }
 
 
@@ -338,7 +339,7 @@ contract OrderContractTest is Test {
         
         // Propose answer to move to Proposed status
         vm.prank(addressController);
-        orderContract.proposeOrderAnswer(keccak256(abi.encodePacked("Test Answer")), initialOfferId, 5 ether);
+        orderContract.proposeOrderAnswer(keccak256(abi.encodePacked("Test Answer")), initialOfferId, 5 ether, SELLER);
         
         // Create another order that stays InProgress
         bytes32 testPromptHash2 = keccak256(abi.encodePacked("Test Prompt 2"));
@@ -373,7 +374,7 @@ contract OrderContractTest is Test {
         vm.stopPrank();
         
         // Act & Assert
-        vm.expectRevert("Order does not belong to user");
+        vm.expectRevert(OrderContract.OrderContract__userHasNoAccessToOffer.selector);
         orderContract.getUserOrderStatus(otherUser, offerId);
     }
 
