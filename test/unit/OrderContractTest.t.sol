@@ -254,6 +254,16 @@ contract OrderContractTest is Test {
         // Assert
         assertEq(controller, expectedController);
     }
+    
+    function testGetOrderIDsByMerchant() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
+        // Arrange
+        uint64 offerId = 1;
+        // Act
+        uint64[] memory orderIds = orderContract.getOrderIDsByMerchant(SELLER);
+        // Assert
+        assertEq(orderIds.length, 1);
+        assertEq(orderIds[0], offerId);
+    }
 
     //////////////////////////////////////
     //    User Order Mapping Tests       //

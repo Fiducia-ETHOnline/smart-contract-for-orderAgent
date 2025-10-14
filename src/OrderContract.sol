@@ -238,6 +238,10 @@ contract OrderContract is ReentrancyGuard{
     function getAnswerHash(uint64 offerId) external view returns (bytes32) {
         return offers[offerId].answerHash;
     }
+    
+    function getOrderIDsByMerchant(address merchant) external view returns (uint64[] memory) {
+        return merchantOrderIds[merchant];
+    }
 
     // User order query functions for backend integration
     
