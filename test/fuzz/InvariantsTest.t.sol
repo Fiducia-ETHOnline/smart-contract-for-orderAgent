@@ -1,5 +1,4 @@
-// SPDX-License_Identifier: MIT
-
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.18;
 
@@ -16,7 +15,7 @@ contract InvariantsTest is StdInvariant, Test {
 
     function setUp() public {
         DeployOrderContract deployer = new DeployOrderContract();
-        (orderContract, helperConfig) = deployer.run();
+        (orderContract, helperConfig,) = deployer.run();
         targetContract(address(orderContract));
     }
 

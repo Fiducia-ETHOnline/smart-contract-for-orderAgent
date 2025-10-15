@@ -25,6 +25,7 @@ pragma solidity ^0.8.18;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {A3AToken} from "./A3Atoken.sol";
 
 contract OrderContract is ReentrancyGuard{
     /* errors */
@@ -57,11 +58,13 @@ contract OrderContract is ReentrancyGuard{
         OrderStatus status;
     }
     /* state variables */
-    uint256 private constant AGENT_FEE = 1 ether; // Fee for agent services. Adjust as needed.
+    uint256 private constant ADDITIONAL_PRECISION = 1e12; // To handle decimals for tokens with less than 18 decimals
+    uint256 private constant AGENT_FEE = 1e6; // Fee for agent services. Adjust as needed.
     uint256 private constant HOLD_UNTIL = 600; // Time in seconds to hold the order. Adjust as needed.
     uint64 private offerID = 0; // Counter for offer IDs
     address private immutable agentController; // Address of the agent controller
     address private immutable pyUSD; // Address of the pyUSD token contract
+    address private immutable a3aToken; // Address of the A3A token contract
     
     // will make mappings to struct!!! thus too messy.
     //////////////////////////////////////////////
@@ -104,31 +107,43 @@ contract OrderContract is ReentrancyGuard{
         _;
         
     }
-    constructor(address agentControllerAddress, address pyUSDAddress) {
+    constructor(address agentControllerAddress, address pyUSDAddress, address a3aTokenAddress) {
         // Initialization logic if needed
         agentController = agentControllerAddress;
         pyUSD = pyUSDAddress;
+        a3aToken = a3aTokenAddress;
     }
-    function proposeOrder(bytes32 promptHash) external returns(uint64 offerId) {
+    function proposeOrder(bytes32 promptHash, address userWalletAddress) external onlyAgentController nonReentrant returns(uint64 offerId) {
         
         // Increment the offer ID counter
         offerID++;
         
         // offerIdToStatus[offerID] = OrderStatus.InProgress;
         offers[offerID].status = OrderStatus.InProgress;
-        offers[offerID].buyer = msg.sender;
+        offers[offerID].buyer = userWalletAddress;
         offers[offerID].promptHash = promptHash;
         
         // Update user order mappings
-        userOrders[msg.sender][offerID] = true;
-        userOrderIds[msg.sender].push(offerID);
+        userOrders[userWalletAddress][offerID] = true;
+        userOrderIds[userWalletAddress].push(offerID);
         
         // addressToOfferIdToPromptHash[msg.sender][offerID] = promptHash;
         // offerIdToUser[offerID] = msg.sender;
+
         emit OrderProposed(offers[offerID].buyer, offerID, offers[offerID].promptHash);
-        
+        // Burn 10 A3A tokens from uses. This acts as Fee for using the platform.
+        _burnA3A(10 ether, userWalletAddress);
         return offerID;
         
+    }
+
+    function _burnA3A(uint256 amount,address A3AFrom) private {
+        
+        bool success = A3AToken(a3aToken).transferFrom(A3AFrom, address(this), amount);
+        if (!success) {
+            revert OrderContract__ERC20TransferFailed();
+        }
+        A3AToken(a3aToken).burn(amount);
     }
 
 
@@ -200,6 +215,16 @@ contract OrderContract is ReentrancyGuard{
         if (!success) {
             revert OrderContract__ERC20TransferFailed();
         }
+    }
+
+
+    function buyA3AToken(uint256 PyUsdAmount) external nonReentrant {
+
+        bool success = ERC20(pyUSD).transferFrom(msg.sender, address(this), PyUsdAmount);
+        if (!success) {
+            revert OrderContract__ERC20TransferFailed();
+        }
+        A3AToken(a3aToken).mint(msg.sender, (PyUsdAmount*ADDITIONAL_PRECISION)*10);
     }
 
 
@@ -332,7 +357,6 @@ contract OrderContract is ReentrancyGuard{
         
         return result;
     }
-
 
 
 }
