@@ -49,6 +49,7 @@ contract OrderContractTest is Test {
       //////////////////////////////////////
     //        Buy A3A tests               //
     //////////////////////////////////////
+  
     function testBuyA3AToken() public {
         
         // Arrange
@@ -68,14 +69,23 @@ contract OrderContractTest is Test {
     //        proposeOrder tests          //
     //////////////////////////////////////
 
+    function testOnlyUserWithA3ABalanceCanProposeOrder() public {
+        // Arrange
+        // Act / Assert
+        vm.prank(addressController);
+        vm.expectRevert();
+        orderContract.proposeOrder(promptHash, USER2);   
+    
+    }
+
     function testProposeOrderUpdatesVariables() public {
         
 
         uint256 expectedOfferId = 1;
 
-        vm.startPrank(USER);
+        vm.startPrank(addressController);
         ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
-        uint64 offerId = orderContract.proposeOrder(promptHash);
+        uint64 offerId = orderContract.proposeOrder(promptHash, USER);
         vm.stopPrank();
         // Assert
         bytes32 storedPromptHash = orderContract.getPromptHash(offerId);
@@ -86,13 +96,14 @@ contract OrderContractTest is Test {
     function testProposeOrderEmitsEvent() public {
         // Arrange
         
-        vm.startPrank(USER);
+        vm.prank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
         // Expect
         vm.expectEmit(true, true, true, false, address(orderContract));
         emit OrderProposed(USER, 1, promptHash);
         // Act
-        orderContract.proposeOrder(promptHash);
+        vm.startPrank(addressController);
+        orderContract.proposeOrder(promptHash, USER);
         vm.stopPrank();
     }
 
@@ -102,9 +113,10 @@ contract OrderContractTest is Test {
     //////////////////////////////////////
 
     modifier proposeOrderForUser() {
-        vm.startPrank(USER);
+        vm.prank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
-        orderContract.proposeOrder(promptHash);
+        vm.startPrank(addressController);
+        orderContract.proposeOrder(promptHash, USER);
         vm.stopPrank();
         _;
         
@@ -218,8 +230,8 @@ contract OrderContractTest is Test {
 
     modifier orderConfirmed() {
         uint256 priceForOffer = 5 ether;
-        vm.startPrank(USER);
-        orderContract.proposeOrder(promptHash);
+        vm.startPrank(addressController);
+        orderContract.proposeOrder(promptHash, USER);
         vm.stopPrank();
         vm.prank(addressController);
         orderContract.proposeOrderAnswer(keccak256(abi.encodePacked("Test Answer")), 1, priceForOffer, SELLER);
@@ -308,9 +320,10 @@ contract OrderContractTest is Test {
         bytes32 testPromptHash = keccak256(abi.encodePacked("Test Prompt"));
         
         // Act
-        vm.startPrank(USER);
+        vm.prank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
-        uint64 offerId = orderContract.proposeOrder(testPromptHash);
+        vm.startPrank(addressController);
+        uint64 offerId = orderContract.proposeOrder(testPromptHash, USER);
         vm.stopPrank();
         
         // Assert
@@ -324,9 +337,10 @@ contract OrderContractTest is Test {
         // Arrange
         bytes32 testPromptHash = keccak256(abi.encodePacked("Test Prompt"));
         
-        vm.startPrank(USER);
+        vm.prank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
-        uint64 offerId = orderContract.proposeOrder(testPromptHash);
+        vm.startPrank(addressController);
+        uint64 offerId = orderContract.proposeOrder(testPromptHash, USER);
         vm.stopPrank();
         
         // Act
@@ -341,10 +355,11 @@ contract OrderContractTest is Test {
         bytes32 testPromptHash1 = keccak256(abi.encodePacked("Test Prompt 1"));
         bytes32 testPromptHash2 = keccak256(abi.encodePacked("Test Prompt 2"));
         
-        vm.startPrank(USER);
+        vm.prank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute * 2);
-        uint64 offerId1 = orderContract.proposeOrder(testPromptHash1);
-        uint64 offerId2 = orderContract.proposeOrder(testPromptHash2);
+        vm.startPrank(addressController);
+        uint64 offerId1 = orderContract.proposeOrder(testPromptHash1, USER);
+        uint64 offerId2 = orderContract.proposeOrder(testPromptHash2, USER);
         vm.stopPrank();
         
         // Act
@@ -363,9 +378,10 @@ contract OrderContractTest is Test {
         // Arrange
         bytes32 testPromptHash = keccak256(abi.encodePacked("Test Prompt"));
         
-        vm.startPrank(USER);
+        vm.prank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
-        uint64 offerId = orderContract.proposeOrder(testPromptHash);
+        vm.startPrank(addressController);
+        uint64 offerId = orderContract.proposeOrder(testPromptHash, USER);
         vm.stopPrank();
         
         // Act
@@ -387,9 +403,10 @@ contract OrderContractTest is Test {
         
         // Create another order that stays InProgress
         bytes32 testPromptHash2 = keccak256(abi.encodePacked("Test Prompt 2"));
-        vm.startPrank(USER);
+        vm.prank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
-        uint64 offerId2 = orderContract.proposeOrder(testPromptHash2);
+        vm.startPrank(addressController);
+        uint64 offerId2 = orderContract.proposeOrder(testPromptHash2, USER);
         vm.stopPrank();
         
         // Act
@@ -412,9 +429,10 @@ contract OrderContractTest is Test {
         // Arrange
         address otherUser = makeAddr("otherUser");
         
-        vm.startPrank(USER);
+        vm.prank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
-        uint64 offerId = orderContract.proposeOrder(promptHash);
+        vm.startPrank(addressController);
+        uint64 offerId = orderContract.proposeOrder(promptHash, USER);
         vm.stopPrank();
         
         // Act & Assert

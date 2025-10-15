@@ -113,26 +113,26 @@ contract OrderContract is ReentrancyGuard{
         pyUSD = pyUSDAddress;
         a3aToken = a3aTokenAddress;
     }
-    function proposeOrder(bytes32 promptHash) external returns(uint64 offerId) {
+    function proposeOrder(bytes32 promptHash, address userWalletAddress) external onlyAgentController nonReentrant returns(uint64 offerId) {
         
         // Increment the offer ID counter
         offerID++;
         
         // offerIdToStatus[offerID] = OrderStatus.InProgress;
         offers[offerID].status = OrderStatus.InProgress;
-        offers[offerID].buyer = msg.sender;
+        offers[offerID].buyer = userWalletAddress;
         offers[offerID].promptHash = promptHash;
         
         // Update user order mappings
-        userOrders[msg.sender][offerID] = true;
-        userOrderIds[msg.sender].push(offerID);
+        userOrders[userWalletAddress][offerID] = true;
+        userOrderIds[userWalletAddress].push(offerID);
         
         // addressToOfferIdToPromptHash[msg.sender][offerID] = promptHash;
         // offerIdToUser[offerID] = msg.sender;
 
         emit OrderProposed(offers[offerID].buyer, offerID, offers[offerID].promptHash);
         // Burn 10 A3A tokens from uses. This acts as Fee for using the platform.
-        _burnA3A(10 ether, msg.sender);
+        _burnA3A(10 ether, userWalletAddress);
         return offerID;
         
     }
