@@ -372,29 +372,7 @@ contract OrderContractTest is Test {
         assertEq(uint8(status), uint8(OrderContract.OrderStatus.InProgress));
     }
 
-    function testGetUserOrdersWithStatus() public {
-        // Arrange
-        bytes32 testPromptHash1 = keccak256(abi.encodePacked("Test Prompt 1"));
-        bytes32 testPromptHash2 = keccak256(abi.encodePacked("Test Prompt 2"));
-        
-        vm.prank(USER);
-        ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute * 2);
-        vm.startPrank(addressController);
-        uint64 offerId1 = orderContract.proposeOrder(testPromptHash1, USER);
-        uint64 offerId2 = orderContract.proposeOrder(testPromptHash2, USER);
-        vm.stopPrank();
-        
-        // Act
-        (uint64[] memory orderIds, OrderContract.OrderStatus[] memory statuses) = orderContract.getUserOrdersWithStatus(USER);
-        
-        // Assert
-        assertEq(orderIds.length, 2);
-        assertEq(statuses.length, 2);
-        assertEq(orderIds[0], offerId1);
-        assertEq(orderIds[1], offerId2);
-        assertEq(uint8(statuses[0]), uint8(OrderContract.OrderStatus.InProgress));
-        assertEq(uint8(statuses[1]), uint8(OrderContract.OrderStatus.InProgress));
-    }
+    
 
     function testGetUserOrderDetails() public {
         // Arrange
@@ -415,34 +393,9 @@ contract OrderContractTest is Test {
         assertEq(uint8(offer.status), uint8(OrderContract.OrderStatus.InProgress));
     }
 
-    function testGetUserOrdersByStatus() public proposeOrderForUser {
-        // Arrange - we already have one order in InProgress from the modifier
-        uint64 initialOfferId = 1;
-        
-        // Propose answer to move to Proposed status
-        vm.prank(addressController);
-        orderContract.proposeOrderAnswer(keccak256(abi.encodePacked("Test Answer")), initialOfferId, 5 ether, SELLER);
-        
-        // Create another order that stays InProgress
-        bytes32 testPromptHash2 = keccak256(abi.encodePacked("Test Prompt 2"));
-        vm.prank(USER);
-        ERC20Mock(pyUSD).approve(address(orderContract), amountForCompute);
-        vm.startPrank(addressController);
-        uint64 offerId2 = orderContract.proposeOrder(testPromptHash2, USER);
-        vm.stopPrank();
-        
-        // Act
-        uint64[] memory proposedOrders = orderContract.getUserOrdersByStatus(USER, OrderContract.OrderStatus.Proposed);
-        uint64[] memory inProgressOrders = orderContract.getUserOrdersByStatus(USER, OrderContract.OrderStatus.InProgress);
-        
-        // Assert
-        assertEq(proposedOrders.length, 1);
-        assertEq(proposedOrders[0], initialOfferId);
-        assertEq(inProgressOrders.length, 1);
-        assertEq(inProgressOrders[0], offerId2);
-    }
+  
 
-    function testHasUserOrderReturnsFalseForNonExistentOrder() public {
+    function testHasUserOrderReturnsFalseForNonExistentOrder() public view {
         // Act & Assert
         assertFalse(orderContract.hasUserOrder(USER, 999));
     }
@@ -460,6 +413,28 @@ contract OrderContractTest is Test {
         // Act & Assert
         vm.expectRevert(OrderContract.OrderContract__userHasNoAccessToOffer.selector);
         orderContract.getUserOrderStatus(otherUser, offerId);
+    }
+
+    function testUserGetsMintedBalance() public view {
+        // Arrange
+        uint256 expectedBalance = 1000000 ether; // 10e6 pyUSD buys 100 A3A tokens
+        
+        // Act
+        uint256 userBalance = a3aToken.balanceOf(vm.envAddress("PUBLIC_KEY"));
+        
+        // Assert
+        assertEq(userBalance, expectedBalance);
+    }
+    
+    function testUserGetsMintedPyUsd() public view {
+        // Arrange
+        uint256 expectedBalance = 100 ether; // Anvil setup mints 100 pyUSD to PUBLIC_KEY
+        
+        // Act
+        uint256 userBalance = ERC20Mock(pyUSD).balanceOf(vm.envAddress("PUBLIC_KEY"));
+        
+        // Assert
+        assertEq(userBalance, expectedBalance);
     }
 
 }

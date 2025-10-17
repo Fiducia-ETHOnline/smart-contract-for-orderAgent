@@ -34,7 +34,7 @@ contract A3AToken is ERC20Burnable, Ownable {
     error A3AToken__MintToTheZeroAddress();
     error A3AToken__MintAmountMustBeMoreThanZero();
 
-    constructor() ERC20("Decentralized Stable Coin", "DSC") Ownable(msg.sender) {}
+    constructor() ERC20("A3A Token", "A3A") Ownable(msg.sender) {}
 
     function burn(uint256 _amount) public override onlyOwner {
         uint256 balance = balanceOf(msg.sender);

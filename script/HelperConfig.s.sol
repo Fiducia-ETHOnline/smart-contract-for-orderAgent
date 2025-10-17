@@ -5,6 +5,7 @@ pragma solidity ^0.8.18;
 import "forge-std/console.sol";
 import {Script} from  "forge-std/Script.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+<<<<<<< HEAD
 contract PyUSDMock is ERC20Mock {
     constructor() ERC20Mock() {
         uint256 mintAmount = 1_000_000 ether;
@@ -27,6 +28,9 @@ contract PyUSDMock is ERC20Mock {
         }
     }
 }
+=======
+
+>>>>>>> origin/main
 contract HelperConfig is Script {
     
     struct NetworkConfig {
@@ -50,6 +54,7 @@ contract HelperConfig is Script {
             return activeNetworkConfig;
         }
         vm.startBroadcast();
+<<<<<<< HEAD
         PyUSDMock pyUSD = new PyUSDMock();
         console.log("pyUSD deployed at:", address(pyUSD));
         vm.stopBroadcast();
@@ -57,6 +62,16 @@ contract HelperConfig is Script {
             pyUSD: address(pyUSD),
             agentController: 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc,
             deployerKey: vm.envUint("PRIVATE_KEY")
+=======
+        ERC20Mock pyUSD = new ERC20Mock();
+        pyUSD.mint(vm.envAddress("PUBLIC_KEY"), 100 ether);
+        
+        vm.stopBroadcast();
+        return NetworkConfig({
+            pyUSD: address(pyUSD),
+            agentController: address(5),
+            deployerKey: vm.envUint("DEFAULT_ANVIL_KEY")
+>>>>>>> origin/main
         });
     
 }
