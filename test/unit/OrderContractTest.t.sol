@@ -72,6 +72,8 @@ contract OrderContractTest is Test {
     function testOnlyUserWithA3ABalanceCanProposeOrder() public {
         // Arrange
         // Act / Assert
+        vm.prank(USER2);
+        a3aToken.approve(address(orderContract), 10e6);
         vm.prank(addressController);
         vm.expectRevert();
         orderContract.proposeOrder(promptHash, USER2);   
@@ -309,6 +311,26 @@ contract OrderContractTest is Test {
         // Assert
         assertEq(orderIds.length, 1);
         assertEq(orderIds[0], offerId);
+    }
+
+    function testGetMerchantOrderDetailsRevertsIfNotMerchant() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
+        // Arrange
+        uint64 offerId = 1;
+        // Act / Assert
+        vm.prank(USER);
+        vm.expectRevert(OrderContract.OrderContract__NotOrderByMerchanProvided.selector);
+        orderContract.getMerchantOrderDetails(USER, offerId);
+    }
+
+    function testGetMerchantOrderDetails() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
+        // Arrange
+        uint64 offerId = 1;
+        // Act
+        OrderContract.Offer memory offer = orderContract.getMerchantOrderDetails(SELLER, offerId);
+        // Assert
+        assertEq(offer.buyer, USER);
+        assertEq(offer.seller, SELLER);
+        assertEq(uint8(offer.status), uint8(OrderContract.OrderStatus.Proposed));
     }
 
     //////////////////////////////////////

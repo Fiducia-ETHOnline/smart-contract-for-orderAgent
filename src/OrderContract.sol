@@ -37,6 +37,7 @@ contract OrderContract is ReentrancyGuard{
     error OrderContract__OrderCannotBeFinalizedInCurrentState();
     error OrderContract__EnoughTimeHasNotPassed();
     error OrderContract__CannotProposeOrderAnswerInCurrentState();
+    error OrderContract__NotOrderByMerchanProvided();
 
     /* type declarations */
     enum OrderStatus {
@@ -266,6 +267,14 @@ contract OrderContract is ReentrancyGuard{
     
     function getOrderIDsByMerchant(address merchant) external view returns (uint64[] memory) {
         return merchantOrderIds[merchant];
+    }
+
+    function getMerchantOrderDetails(address merchant, uint64 orderId) external view returns (Offer memory) {
+        // Check if the order belongs to the merchant
+        if (offers[orderId].seller != merchant) {
+            revert OrderContract__NotOrderByMerchanProvided();
+        }
+        return offers[orderId];
     }
 
     // User order query functions for backend integration
