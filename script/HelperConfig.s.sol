@@ -5,6 +5,7 @@ pragma solidity ^0.8.18;
 
 import {Script} from  "forge-std/Script.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+
 contract HelperConfig is Script {
     
     struct NetworkConfig {
@@ -29,12 +30,13 @@ contract HelperConfig is Script {
         }
         vm.startBroadcast();
         ERC20Mock pyUSD = new ERC20Mock();
+        pyUSD.mint(vm.envAddress("PUBLIC_KEY"), 100 ether);
         
         vm.stopBroadcast();
         return NetworkConfig({
             pyUSD: address(pyUSD),
             agentController: address(5),
-            deployerKey: vm.envUint("PRIVATE_KEY")
+            deployerKey: vm.envUint("DEFAULT_ANVIL_KEY")
         });
     
 }

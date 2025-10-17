@@ -20,7 +20,14 @@ contract DeployOrderContract is Script {
         OrderContract orderContract = new OrderContract(
         agentController,  pyUSD, address(token) // Replace with actual pyUSD token address
         );
+        if (block.chainid == 31337) {
+            
+            token.mint(vm.envAddress("PUBLIC_KEY"), 1000000 ether);
+            
+        }
         token.transferOwnership(address(orderContract));
+
+        
         
         vm.stopBroadcast();
         return (orderContract, helperConfig, token);

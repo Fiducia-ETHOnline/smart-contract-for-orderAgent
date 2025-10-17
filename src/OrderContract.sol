@@ -67,21 +67,10 @@ contract OrderContract is ReentrancyGuard{
     address private immutable pyUSD; // Address of the pyUSD token contract
     address private immutable a3aToken; // Address of the A3A token contract
     
-    // will make mappings to struct!!! thus too messy.
-    //////////////////////////////////////////////
-    //  FIX THIS!!!!
-    ///////////////////////////////////
-    // mapping(address => mapping(uint64 offerId => bytes32 promptHash)) private addressToOfferIdToPromptHash;
-    // mapping(uint64 offerId => uint256 timestamp) private offerIdToTimestamp;
-    // mapping(uint64 offerId => mapping(address user => uint256 amountPaid)) private offerIdToUserToAmountPaid;
-    // mapping(uint64 offerId => OrderStatus status) private offerIdToStatus;
-    // mapping(uint64 offerId => bytes32 answerHash) private offerIdToAnswerHash;
-    // mapping(uint64 => address) private offerIdToUser;
 
     mapping(uint64 => Offer) public offers;
     
-    // User order tracking mappings
-    mapping(address => mapping(uint64 => bool)) private userOrders;
+   
     mapping(address => uint64[]) private userOrderIds;
 
     // merchants address->orderIds mapping to fetch all orders for a merchant
@@ -125,11 +114,9 @@ contract OrderContract is ReentrancyGuard{
         offers[offerID].promptHash = promptHash;
         
         // Update user order mappings
-        userOrders[userWalletAddress][offerID] = true;
+       
         userOrderIds[userWalletAddress].push(offerID);
-        
-        // addressToOfferIdToPromptHash[msg.sender][offerID] = promptHash;
-        // offerIdToUser[offerID] = msg.sender;
+      
 
         emit OrderProposed(offers[offerID].buyer, offerID, offers[offerID].promptHash);
         // Burn 10 A3A tokens from uses. This acts as Fee for using the platform.
@@ -155,12 +142,10 @@ contract OrderContract is ReentrancyGuard{
         }
         // update amount paid for the offer by the user
         uint256 amountToPay = offers[offerId].price + AGENT_FEE;
-        // offerIdToUserToAmountPaid[offerId][msg.sender] += amountToPay;
-        // offerIdToStatus[offerId] = OrderStatus.Confirmed;
+    
         offers[offerId].paid = amountToPay;
         offers[offerId].status = OrderStatus.Confirmed;
-        // Record the current timestamp for the offer
-        // offerIdToTimestamp[offerId] = block.timestamp;
+       
         offers[offerId].timestamp = block.timestamp;
         bool success= ERC20(pyUSD).transferFrom(msg.sender, address(this), amountToPay);
         
@@ -277,6 +262,10 @@ contract OrderContract is ReentrancyGuard{
         return offers[orderId];
     }
 
+    function getA3ATokenAddress() external view returns (address) {
+        return a3aToken;
+    }
+
     // User order query functions for backend integration
     
     /**
@@ -294,8 +283,12 @@ contract OrderContract is ReentrancyGuard{
      * @param orderId The order ID to check
      * @return bool indicating if the user has this order
      */
-    function hasUserOrder(address user, uint64 orderId) external view returns (bool) {
-        return userOrders[user][orderId];
+    function hasUserOrder(address user, uint64 orderId) public view returns (bool) {
+        if (offers[orderId].buyer == user) {
+            return true;
+        } else {
+            return false;
+        }
     }
     
     /**
@@ -311,23 +304,8 @@ contract OrderContract is ReentrancyGuard{
         // require(userOrders[user][orderId], "Order does not belong to user");
         return offers[orderId].status;
     }
+  
     
-    /**
-     * @notice Get all orders with their statuses for a specific user
-     * @param user The user address to query
-     * @return orderIds Array of order IDs
-     * @return statuses Array of corresponding order statuses
-     */
-    function getUserOrdersWithStatus(address user) external view returns (uint64[] memory orderIds, OrderStatus[] memory statuses) {
-        uint64[] memory userIds = userOrderIds[user];
-        OrderStatus[] memory orderStatuses = new OrderStatus[](userIds.length);
-        
-        for (uint256 i = 0; i < userIds.length; i++) {
-            orderStatuses[i] = offers[userIds[i]].status;
-        }
-        
-        return (userIds, orderStatuses);
-    }
     
     /**
      * @notice Get complete order details for a user's specific order
@@ -336,36 +314,14 @@ contract OrderContract is ReentrancyGuard{
      * @return Complete Offer struct for the specified order
      */
     function getUserOrderDetails(address user, uint64 orderId) external view returns (Offer memory) {
-        require(userOrders[user][orderId], "Order does not belong to user");
+        if (hasUserOrder(user, orderId) == false) {
+            revert OrderContract__userHasNoAccessToOffer();
+        }
         return offers[orderId];
     }
     
-    /**
-     * @notice Get orders filtered by status for a user
-     * @param user The user address
-     * @param status The status to filter by
-     * @return Array of order IDs matching the specified status
-     */
-    function getUserOrdersByStatus(address user, OrderStatus status) external view returns (uint64[] memory) {
-        uint64[] memory userIds = userOrderIds[user];
-        uint64[] memory filteredIds = new uint64[](userIds.length);
-        uint256 count = 0;
-        
-        for (uint256 i = 0; i < userIds.length; i++) {
-            if (offers[userIds[i]].status == status) {
-                filteredIds[count] = userIds[i];
-                count++;
-            }
-        }
-        
-        // Create a properly sized array
-        uint64[] memory result = new uint64[](count);
-        for (uint256 i = 0; i < count; i++) {
-            result[i] = filteredIds[i];
-        }
-        
-        return result;
-    }
+   
+   
 
 
 }
