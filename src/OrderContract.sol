@@ -66,8 +66,7 @@ contract OrderContract is ReentrancyGuard{
     address private immutable i_agentController; // Address of the agent controller
     address private immutable i_pyUSD; // Address of the pyUSD token contract
     address private immutable i_a3aToken; // Address of the A3A token contract
-    
-
+    // mappings
     mapping(uint64 => Offer) public offers;
     mapping(address => uint64[]) private userOrderIds;
     mapping(address => uint64[]) private merchantOrderIds;
@@ -77,7 +76,8 @@ contract OrderContract is ReentrancyGuard{
     event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash);
     event OrderConfirmed(address indexed user, uint64 indexed offerId, uint256 indexed amountPaid);
     event orderFinalized(address indexed user, uint64 indexed offerId);
-    /* modifiers */
+   
+   /* modifiers */
     modifier onlyAgentController() {
         // Placeholder for access control logic
         if (msg.sender != i_agentController) {
@@ -93,6 +93,9 @@ contract OrderContract is ReentrancyGuard{
         _;
         
     }
+
+    /* functions */
+
     constructor(address agentControllerAddress, address pyUSDAddress, address a3aTokenAddress) {
         // Initialization logic if needed
         i_agentController = agentControllerAddress;
@@ -111,16 +114,13 @@ contract OrderContract is ReentrancyGuard{
         // Increment the offer ID counter
         offerID++;
         
-        // offerIdToStatus[offerID] = OrderStatus.InProgress;
+        // Update user order mappings
         offers[offerID].status = OrderStatus.InProgress;
         offers[offerID].buyer = userWalletAddress;
         offers[offerID].promptHash = promptHash;
-        
-        // Update user order mappings
        
         userOrderIds[userWalletAddress].push(offerID);
       
-
         emit OrderProposed(offers[offerID].buyer, offerID, offers[offerID].promptHash);
         // Burn 10 A3A tokens from uses. This acts as Fee for using the platform.
         _burnA3A(10 ether, userWalletAddress);
@@ -180,8 +180,7 @@ contract OrderContract is ReentrancyGuard{
         if (offers[offerId].status != OrderStatus.InProgress) {
             revert OrderContract__CannotProposeOrderAnswerInCurrentState();
         }
-        // offerIdToAnswerHash[offerId] = answerHash;
-        // offerIdToStatus[offerId] = OrderStatus.Proposed;
+        
         offers[offerId].answerHash = answerHash;
         offers[offerId].status = OrderStatus.Proposed;
         offers[offerId].price = priceForOffer;
