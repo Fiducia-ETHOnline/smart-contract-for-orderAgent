@@ -126,12 +126,18 @@ contract OrderContractTest is Test {
 
     modifier orderProposedAnsweredByAgent(uint64 offerId, bytes32 answerHash) {
         uint256 priceForOffer = 5 ether;
-        vm.prank(addressController);
-        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer, SELLER);
+        vm.prank(SELLER);
+        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer);
         _;
     }
 
-    function testOnlyUserWithOfferCanConfirmOrder() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
+    modifier merchantSetForOrder(uint64 offerId, address seller) {
+        vm.prank(addressController);
+        orderContract.setSellerForOrder(offerId, seller);
+        _;
+    }
+
+    function testOnlyUserWithOfferCanConfirmOrder() public proposeOrderForUser merchantSetForOrder(1, SELLER) orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
         // Arrange
         uint64 offerId = 1;
         // Act / Assert
@@ -141,12 +147,13 @@ contract OrderContractTest is Test {
     
     }
 
-    function testConfirmOrderUpdatesAmountPaidAndTimeStamp() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
+    function testConfirmOrderUpdatesAmountPaidAndTimeStamp() public proposeOrderForUser merchantSetForOrder(1, SELLER) orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
         // Arrange
         uint64 offerId = 1;
         uint256 priceForOffer = 5 ether;
         uint256 expectedAmountPaid = priceForOffer + orderContract.getAgentFee(); // AGENT_FEE i 1 ether
         uint256 expectedTimeStamp = block.timestamp;
+
         // Act
         vm.startPrank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), expectedAmountPaid);
@@ -158,7 +165,7 @@ contract OrderContractTest is Test {
         assertEq(orderContract.getOfferIdToTimestamp(offerId), expectedTimeStamp);
     }
     
-    function testConfirmOrderEmitsEvent() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))){
+    function testConfirmOrderEmitsEvent() public proposeOrderForUser merchantSetForOrder(1, SELLER) orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))){
         // Arrange
         uint64 offerId = 1;
         uint256 priceForOffer = 5 ether;
@@ -188,25 +195,25 @@ contract OrderContractTest is Test {
     //        proposeOrderAnswer tests    //
     //////////////////////////////////////
 
-    function testOnlyControllerCanProposeAnswer() public proposeOrderForUser {
-        uint256 priceForOffer = 5 ether;
+    function testOnlySellerCanProposeAnswer() public proposeOrderForUser {
         // Arrange
+        uint256 priceForOffer = 5 ether;
         uint64 offerId = 1;
         bytes32 answerHash = keccak256(abi.encodePacked("Test Answer"));
         // Act / Assert
         vm.prank(address(0x123));
-        vm.expectRevert(OrderContract.OrderContract__notAgentController.selector);
-        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer, SELLER);   
+        vm.expectRevert(OrderContract.OrderContract__MerchantHasNoAccessToOffer.selector);
+        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer);  
     }
     
-    function testProposeOrderAnswerUpdatesState() public proposeOrderForUser {
+    function testProposeOrderAnswerUpdatesState() public proposeOrderForUser merchantSetForOrder(1, SELLER) {
         // Arrange
         uint256 priceForOffer = 5 ether;
         uint64 offerId = 1;
         bytes32 answerHash = keccak256(abi.encodePacked("Test Answer"));
         // Act
-        vm.prank(addressController);
-        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer, SELLER);   
+        vm.prank(SELLER);
+        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer);   
         // Assert
         bytes32 storedAnswerHash = orderContract.getAnswerHash(offerId);
         assertEq(storedAnswerHash, answerHash);
@@ -214,15 +221,15 @@ contract OrderContractTest is Test {
         assertEq(uint8(status), uint8(OrderContract.OrderStatus.Proposed));
     }
 
-    function testProposeOrderAnswerRevertsIfNotInProgress() public {
+    function testProposeOrderAnswerRevertsIfNotInProgress() public proposeOrderForUser merchantSetForOrder(1, SELLER) orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
         // Arrange
         uint256 priceForOffer = 5 ether;
         uint64 offerId = 1;
         bytes32 answerHash = keccak256(abi.encodePacked("Test Answer"));
         // Act / Assert
-        vm.prank(addressController);
+        vm.prank(SELLER);
         vm.expectRevert(OrderContract.OrderContract__CannotProposeOrderAnswerInCurrentState.selector);
-        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer, SELLER);
+        orderContract.proposeOrderAnswer(answerHash, offerId, priceForOffer);
     }
 
     
@@ -236,7 +243,9 @@ contract OrderContractTest is Test {
         orderContract.proposeOrder(promptHash, USER);
         vm.stopPrank();
         vm.prank(addressController);
-        orderContract.proposeOrderAnswer(keccak256(abi.encodePacked("Test Answer")), 1, priceForOffer, SELLER);
+        orderContract.setSellerForOrder(1, SELLER);
+        vm.prank(SELLER);
+        orderContract.proposeOrderAnswer(keccak256(abi.encodePacked("Test Answer")), 1, priceForOffer);
         uint256 expectedAmountPaid = 5 ether + orderContract.getAgentFee();
         vm.startPrank(USER);
         ERC20Mock(pyUSD).approve(address(orderContract), expectedAmountPaid);
@@ -245,11 +254,11 @@ contract OrderContractTest is Test {
         _;
     }
      
-    function testFinalizeOrderCanOnlyBeCalledWhenStateIsConfirmed() public {
+    function testFinalizeOrderCanOnlyBeCalledWhenStateIsConfirmed() public proposeOrderForUser merchantSetForOrder(1, SELLER) orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
         // Arrange
         uint64 offerId = 1;
         // Act / Assert
-        vm.prank(addressController);
+        vm.prank(SELLER);
         vm.expectRevert(OrderContract.OrderContract__OrderCannotBeFinalizedInCurrentState.selector);
         orderContract.finalizeOrder(offerId);   
     }
@@ -258,7 +267,7 @@ contract OrderContractTest is Test {
         // Arrange
         uint64 offerId = 1;
         // Act
-        vm.prank(addressController);
+        vm.prank(SELLER);
         orderContract.finalizeOrder(offerId);   
         // Assert
         OrderContract.OrderStatus status = orderContract.getOfferStatus(offerId);
@@ -271,7 +280,7 @@ contract OrderContractTest is Test {
         uint256 sellerBalanceBefore = ERC20Mock(pyUSD).balanceOf(SELLER);
         uint256 expectedAmountPaid = 5 ether + orderContract.getAgentFee();
         // Act
-        vm.prank(addressController);
+        vm.prank(SELLER);
         orderContract.finalizeOrder(offerId);   
         uint256 sellerBalanceAfter = ERC20Mock(pyUSD).balanceOf(SELLER);
         // Assert
@@ -303,7 +312,7 @@ contract OrderContractTest is Test {
         assertEq(controller, expectedController);
     }
     
-    function testGetOrderIDsByMerchant() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
+    function testGetOrderIDsByMerchant() public proposeOrderForUser merchantSetForOrder(1, SELLER) orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
         // Arrange
         uint64 offerId = 1;
         // Act
@@ -313,7 +322,7 @@ contract OrderContractTest is Test {
         assertEq(orderIds[0], offerId);
     }
 
-    function testGetMerchantOrderDetailsRevertsIfNotMerchant() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
+    function testGetMerchantOrderDetailsRevertsIfNotMerchant() public proposeOrderForUser merchantSetForOrder(1, SELLER) orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
         // Arrange
         uint64 offerId = 1;
         // Act / Assert
@@ -322,7 +331,7 @@ contract OrderContractTest is Test {
         orderContract.getMerchantOrderDetails(USER, offerId);
     }
 
-    function testGetMerchantOrderDetails() public proposeOrderForUser orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
+    function testGetMerchantOrderDetails() public proposeOrderForUser merchantSetForOrder(1, SELLER) orderProposedAnsweredByAgent(1, keccak256(abi.encodePacked("Test Answer"))) {
         // Arrange
         uint64 offerId = 1;
         // Act

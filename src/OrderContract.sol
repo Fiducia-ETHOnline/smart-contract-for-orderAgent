@@ -38,6 +38,9 @@ contract OrderContract is ReentrancyGuard{
     error OrderContract__EnoughTimeHasNotPassed();
     error OrderContract__CannotProposeOrderAnswerInCurrentState();
     error OrderContract__NotOrderByMerchanProvided();
+    error OrderContract__MerchantHasNoAccessToOffer();
+    error OrderContract__MerchantAlreadySetForOrder();
+    error OrderContract__CannotSetMerchantForOrderInCurrentState();
 
     /* type declarations */
     enum OrderStatus {
@@ -89,6 +92,15 @@ contract OrderContract is ReentrancyGuard{
         // Ensure the caller has a valid offer
         if (offers[offerId].buyer != msg.sender) {
             revert OrderContract__userHasNoAccessToOffer();
+        }
+        _;
+        
+    }
+
+    modifier onlySellerWithOffer(uint64 offerId) {
+        // Ensure the caller is the seller for the offer
+        if (offers[offerId].seller != msg.sender) {
+            revert OrderContract__MerchantHasNoAccessToOffer();
         }
         _;
         
@@ -170,13 +182,12 @@ contract OrderContract is ReentrancyGuard{
 
 
     /**
-     * @notice Agent controller proposes the answer for the order. Marks order as Proposed.
+     * @notice merchant proposes the answer for the order. Marks order as Proposed.
      * @param answerHash The hash/CID of the answer generated for the prompt. The order that user should later confirm.
      * @param offerId The ID of the offer to propose answer for
      * @param priceForOffer amount the user should pay for the offer
-     * @param seller the merchant/seller address fulfilling the order.
      */
-    function proposeOrderAnswer(bytes32 answerHash, uint64 offerId, uint256 priceForOffer, address seller) external onlyAgentController {
+    function proposeOrderAnswer(bytes32 answerHash, uint64 offerId, uint256 priceForOffer) external onlySellerWithOffer(offerId) {
         if (offers[offerId].status != OrderStatus.InProgress) {
             revert OrderContract__CannotProposeOrderAnswerInCurrentState();
         }
@@ -184,16 +195,16 @@ contract OrderContract is ReentrancyGuard{
         offers[offerId].answerHash = answerHash;
         offers[offerId].status = OrderStatus.Proposed;
         offers[offerId].price = priceForOffer;
-        offers[offerId].seller = seller;
-        merchantOrderIds[seller].push(offerId);
+        
+        merchantOrderIds[msg.sender].push(offerId);
     }
     /**
      * @notice Finalize the order by transferring the paid amount to the seller.
-     * Marks order as Completed. Only our order agent should be able to confirm. To prevent fraud.
+     * Marks order as Completed. Only the merhcant can confirm.
      * @param offerId The ID of the offer to finalize
      * @return bool indicating successful finalization
      */
-    function finalizeOrder(uint64 offerId) external onlyAgentController nonReentrant returns(bool){
+    function finalizeOrder(uint64 offerId) external onlySellerWithOffer(offerId) nonReentrant returns(bool){
         if (offers[offerId].status != OrderStatus.Confirmed) {
             revert OrderContract__OrderCannotBeFinalizedInCurrentState();
         }
@@ -239,6 +250,16 @@ contract OrderContract is ReentrancyGuard{
             revert OrderContract__ERC20TransferFailed();
         }
         A3AToken(i_a3aToken).mint(msg.sender, (PyUsdAmount*ADDITIONAL_PRECISION)*100);
+    }
+
+    function setSellerForOrder(uint64 offerId, address newSeller) external onlyAgentController {
+        if (offers[offerId].seller != address(0)) {
+            revert OrderContract__MerchantAlreadySetForOrder();
+        }
+        if (offers[offerId].status != OrderStatus.InProgress) {
+            revert OrderContract__CannotSetMerchantForOrderInCurrentState();
+        }
+        offers[offerId].seller = newSeller;
     }
 
 
