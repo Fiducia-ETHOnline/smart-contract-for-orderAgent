@@ -54,7 +54,7 @@ contract OrderContractTest is Test {
         
         // Arrange
         uint256 amountToBuy = 10e6;
-        uint256 expectedBalanceOfA3A = 100 ether;
+        uint256 expectedBalanceOfA3A = 1000 ether;
         // Act
         vm.startPrank(USER2);
         ERC20Mock(pyUSD).approve(address(orderContract), amountToBuy);

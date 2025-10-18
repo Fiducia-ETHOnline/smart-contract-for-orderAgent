@@ -63,17 +63,13 @@ contract OrderContract is ReentrancyGuard{
     uint256 private constant AGENT_FEE = 1e6; // Fee for agent services. Adjust as needed.
     uint256 private constant HOLD_UNTIL = 600; // Time in seconds to hold the order. Adjust as needed.
     uint64 private offerID = 0; // Counter for offer IDs
-    address private immutable agentController; // Address of the agent controller
-    address private immutable pyUSD; // Address of the pyUSD token contract
-    address private immutable a3aToken; // Address of the A3A token contract
+    address private immutable i_agentController; // Address of the agent controller
+    address private immutable i_pyUSD; // Address of the pyUSD token contract
+    address private immutable i_a3aToken; // Address of the A3A token contract
     
 
     mapping(uint64 => Offer) public offers;
-    
-   
     mapping(address => uint64[]) private userOrderIds;
-
-    // merchants address->orderIds mapping to fetch all orders for a merchant
     mapping(address => uint64[]) private merchantOrderIds;
 
     
@@ -84,7 +80,7 @@ contract OrderContract is ReentrancyGuard{
     /* modifiers */
     modifier onlyAgentController() {
         // Placeholder for access control logic
-        if (msg.sender != agentController) {
+        if (msg.sender != i_agentController) {
             revert OrderContract__notAgentController();
         }
         _;
@@ -99,10 +95,17 @@ contract OrderContract is ReentrancyGuard{
     }
     constructor(address agentControllerAddress, address pyUSDAddress, address a3aTokenAddress) {
         // Initialization logic if needed
-        agentController = agentControllerAddress;
-        pyUSD = pyUSDAddress;
-        a3aToken = a3aTokenAddress;
+        i_agentController = agentControllerAddress;
+        i_pyUSD = pyUSDAddress;
+        i_a3aToken = a3aTokenAddress;
     }
+
+    /**
+     * @notice Propose a new order on the platform. Saves the prompt hash
+     * and user wallet address and marks order as InProgress. Only our order agent can call
+     * @param promptHash The hash/CID from user prompt
+     * @param userWalletAddress The address of the user wallet using the platform
+     */
     function proposeOrder(bytes32 promptHash, address userWalletAddress) external onlyAgentController nonReentrant returns(uint64 offerId) {
         
         // Increment the offer ID counter
@@ -125,17 +128,26 @@ contract OrderContract is ReentrancyGuard{
         
     }
 
+    /**
+     * 
+     * @param amount the amount of A3A tokens to burn
+     * @param A3AFrom the address from which to burn A3A tokens
+     */
     function _burnA3A(uint256 amount,address A3AFrom) private {
         
-        bool success = A3AToken(a3aToken).transferFrom(A3AFrom, address(this), amount);
+        bool success = A3AToken(i_a3aToken).transferFrom(A3AFrom, address(this), amount);
         if (!success) {
             revert OrderContract__ERC20TransferFailed();
         }
-        A3AToken(a3aToken).burn(amount);
+        A3AToken(i_a3aToken).burn(amount);
     }
 
 
-
+    /**
+     * @notice User confirms the order by paying the amount + agent fee. Marks order as confirmed.
+     * Only user who proposed the order can confirm it.
+     * @param offerId The ID of the offer to confirm
+     */
     function confirmOrder(uint64 offerId) external nonReentrant onlyUserWithOffer(offerId) {
         if ( offers[offerId].status != OrderStatus.Proposed) {
             revert OrderContract__OrderCannotBeConfirmedInCurrentState();
@@ -147,7 +159,7 @@ contract OrderContract is ReentrancyGuard{
         offers[offerId].status = OrderStatus.Confirmed;
        
         offers[offerId].timestamp = block.timestamp;
-        bool success= ERC20(pyUSD).transferFrom(msg.sender, address(this), amountToPay);
+        bool success= ERC20(i_pyUSD).transferFrom(msg.sender, address(this), amountToPay);
         
         if (!success) {
             revert OrderContract__ERC20TransferFailed();
@@ -157,7 +169,13 @@ contract OrderContract is ReentrancyGuard{
     }
 
 
-    // Save answer from propose order. Answer will be the proposed order. Set orderStatus to proposed.
+    /**
+     * @notice Agent controller proposes the answer for the order. Marks order as Proposed.
+     * @param answerHash The hash/CID of the answer generated for the prompt. The order that user should later confirm.
+     * @param offerId The ID of the offer to propose answer for
+     * @param priceForOffer amount the user should pay for the offer
+     * @param seller the merchant/seller address fulfilling the order.
+     */
     function proposeOrderAnswer(bytes32 answerHash, uint64 offerId, uint256 priceForOffer, address seller) external onlyAgentController {
         if (offers[offerId].status != OrderStatus.InProgress) {
             revert OrderContract__CannotProposeOrderAnswerInCurrentState();
@@ -170,7 +188,12 @@ contract OrderContract is ReentrancyGuard{
         offers[offerId].seller = seller;
         merchantOrderIds[seller].push(offerId);
     }
-
+    /**
+     * @notice Finalize the order by transferring the paid amount to the seller.
+     * Marks order as Completed. Only our order agent should be able to confirm. To prevent fraud.
+     * @param offerId The ID of the offer to finalize
+     * @return bool indicating successful finalization
+     */
     function finalizeOrder(uint64 offerId) external onlyAgentController nonReentrant returns(bool){
         if (offers[offerId].status != OrderStatus.Confirmed) {
             revert OrderContract__OrderCannotBeFinalizedInCurrentState();
@@ -179,7 +202,7 @@ contract OrderContract is ReentrancyGuard{
         offers[offerId].status = OrderStatus.Completed;
         uint256 amountPaid = offers[offerId].paid;
         emit orderFinalized(getUserByOfferId(offerId), offerId);
-        bool success = ERC20(pyUSD).transfer(offers[offerId].seller, amountPaid);
+        bool success = ERC20(i_pyUSD).transfer(offers[offerId].seller, amountPaid);
         if (!success) {
             revert OrderContract__ERC20TransferFailed();
         }
@@ -187,7 +210,10 @@ contract OrderContract is ReentrancyGuard{
         return true;
 
     }
-
+    /**
+     * @notice Cancel the order if enough time has passed since confirmation. Marks order as Cancelled. Only user who proposed and confirmed the order can cancel it.
+     * @param offerId The ID of the offer to cancel
+     */
     function cancelOrder(uint64 offerId) external nonReentrant onlyUserWithOffer(offerID) {
         if (block.timestamp - offers[offerId].timestamp < HOLD_UNTIL) {
             revert OrderContract__EnoughTimeHasNotPassed();
@@ -197,20 +223,23 @@ contract OrderContract is ReentrancyGuard{
         }
         // offerIdToStatus[offerId] = OrderStatus.Cancelled;
         offers[offerId].status = OrderStatus.Cancelled;
-        bool success = ERC20(pyUSD).transfer(msg.sender, offers[offerId].paid);
+        bool success = ERC20(i_pyUSD).transfer(msg.sender, offers[offerId].paid);
         if (!success) {
             revert OrderContract__ERC20TransferFailed();
         }
     }
 
-
+    /**
+     * @notice Buy A3A tokens by spending pyUSD tokens. Users can buy A3A tokens to use our platform.
+     * @param PyUsdAmount amount of pyUSD to spend on buying A3A tokens
+     */
     function buyA3AToken(uint256 PyUsdAmount) external nonReentrant {
 
-        bool success = ERC20(pyUSD).transferFrom(msg.sender, address(this), PyUsdAmount);
+        bool success = ERC20(i_pyUSD).transferFrom(msg.sender, address(this), PyUsdAmount);
         if (!success) {
             revert OrderContract__ERC20TransferFailed();
         }
-        A3AToken(a3aToken).mint(msg.sender, (PyUsdAmount*ADDITIONAL_PRECISION)*10);
+        A3AToken(i_a3aToken).mint(msg.sender, (PyUsdAmount*ADDITIONAL_PRECISION)*100);
     }
 
 
@@ -225,7 +254,7 @@ contract OrderContract is ReentrancyGuard{
     }
 
     function getAgentController() external view returns (address) {
-        return agentController;
+        return i_agentController;
     }
 
     function getAgentFee() external pure returns (uint256) {
@@ -263,7 +292,7 @@ contract OrderContract is ReentrancyGuard{
     }
 
     function getA3ATokenAddress() external view returns (address) {
-        return a3aToken;
+        return i_a3aToken;
     }
 
     // User order query functions for backend integration
