@@ -28,7 +28,9 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {A3AToken} from "./A3Atoken.sol";
 
 contract OrderContract is ReentrancyGuard{
-    /* errors */
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
     error OrderContract__notAgentController();
     error OrderContract__ERC20TransferFailed();
     error OrderContract__userHasNoAccessToOffer();
@@ -39,7 +41,9 @@ contract OrderContract is ReentrancyGuard{
     error OrderContract__CannotProposeOrderAnswerInCurrentState();
     error OrderContract__NotOrderByMerchanProvided();
 
-    /* type declarations */
+    /*//////////////////////////////////////////////////////////////
+                           TYPE DECLARATIONS
+    //////////////////////////////////////////////////////////////*/
     enum OrderStatus {
         Proposed,
         Confirmed,
@@ -58,7 +62,10 @@ contract OrderContract is ReentrancyGuard{
         uint256 timestamp;
         OrderStatus status;
     }
-    /* state variables */
+    
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
     uint256 private constant ADDITIONAL_PRECISION = 1e12; // To handle decimals for tokens with less than 18 decimals
     uint256 private constant AGENT_FEE = 1e6; // Fee for agent services. Adjust as needed.
     uint256 private constant HOLD_UNTIL = 600; // Time in seconds to hold the order. Adjust as needed.
@@ -66,18 +73,22 @@ contract OrderContract is ReentrancyGuard{
     address private immutable i_agentController; // Address of the agent controller
     address private immutable i_pyUSD; // Address of the pyUSD token contract
     address private immutable i_a3aToken; // Address of the A3A token contract
-    // mappings
+    
     mapping(uint64 => Offer) public offers;
     mapping(address => uint64[]) private userOrderIds;
     mapping(address => uint64[]) private merchantOrderIds;
 
     
-    /* events */
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
     event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash);
     event OrderConfirmed(address indexed user, uint64 indexed offerId, uint256 indexed amountPaid);
     event orderFinalized(address indexed user, uint64 indexed offerId);
    
-   /* modifiers */
+    /*//////////////////////////////////////////////////////////////
+                               MODIFIERS
+    //////////////////////////////////////////////////////////////*/
     modifier onlyAgentController() {
         // Placeholder for access control logic
         if (msg.sender != i_agentController) {
@@ -94,8 +105,9 @@ contract OrderContract is ReentrancyGuard{
         
     }
 
-    /* functions */
-
+    /*//////////////////////////////////////////////////////////////
+                               FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
     constructor(address agentControllerAddress, address pyUSDAddress, address a3aTokenAddress) {
         // Initialization logic if needed
         i_agentController = agentControllerAddress;
@@ -103,6 +115,9 @@ contract OrderContract is ReentrancyGuard{
         i_a3aToken = a3aTokenAddress;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
     /**
      * @notice Propose a new order on the platform. Saves the prompt hash
      * and user wallet address and marks order as InProgress. Only our order agent can call
@@ -126,20 +141,6 @@ contract OrderContract is ReentrancyGuard{
         _burnA3A(10 ether, userWalletAddress);
         return offerID;
         
-    }
-
-    /**
-     * 
-     * @param amount the amount of A3A tokens to burn
-     * @param A3AFrom the address from which to burn A3A tokens
-     */
-    function _burnA3A(uint256 amount,address A3AFrom) private {
-        
-        bool success = A3AToken(i_a3aToken).transferFrom(A3AFrom, address(this), amount);
-        if (!success) {
-            revert OrderContract__ERC20TransferFailed();
-        }
-        A3AToken(i_a3aToken).burn(amount);
     }
 
 
@@ -187,7 +188,9 @@ contract OrderContract is ReentrancyGuard{
         offers[offerId].seller = seller;
         merchantOrderIds[seller].push(offerId);
     }
-    /**
+    
+
+     /**
      * @notice Finalize the order by transferring the paid amount to the seller.
      * Marks order as Completed. Only our order agent should be able to confirm. To prevent fraud.
      * @param offerId The ID of the offer to finalize
@@ -209,6 +212,8 @@ contract OrderContract is ReentrancyGuard{
         return true;
 
     }
+
+
     /**
      * @notice Cancel the order if enough time has passed since confirmation. Marks order as Cancelled. Only user who proposed and confirmed the order can cancel it.
      * @param offerId The ID of the offer to cancel
@@ -228,6 +233,7 @@ contract OrderContract is ReentrancyGuard{
         }
     }
 
+
     /**
      * @notice Buy A3A tokens by spending pyUSD tokens. Users can buy A3A tokens to use our platform.
      * @param PyUsdAmount amount of pyUSD to spend on buying A3A tokens
@@ -240,10 +246,29 @@ contract OrderContract is ReentrancyGuard{
         }
         A3AToken(i_a3aToken).mint(msg.sender, (PyUsdAmount*ADDITIONAL_PRECISION)*100);
     }
+     
+
+    /*//////////////////////////////////////////////////////////////
+                     INTERNAL AND PRIVATE FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+     /**
+     * @notice Internal function to burn A3A tokens from a specified address.
+     * @param amount the amount of A3A tokens to burn
+     * @param A3AFrom the address from which to burn A3A tokens
+     */
+     function _burnA3A(uint256 amount,address A3AFrom) private {
+        
+        bool success = A3AToken(i_a3aToken).transferFrom(A3AFrom, address(this), amount);
+        if (!success) {
+            revert OrderContract__ERC20TransferFailed();
+        }
+        A3AToken(i_a3aToken).burn(amount);
+    }
 
 
-
-    /* getter functions */
+    /*//////////////////////////////////////////////////////////////
+                       VIEW AND GETTER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
     function getPromptHash(uint64 offerId) external view returns (bytes32) {
         return offers[offerId].promptHash;
     }
@@ -264,7 +289,9 @@ contract OrderContract is ReentrancyGuard{
         return offers[offerId].timestamp;
     }
 
-
+    function getPyUSDAddress() external view returns (address) {
+        return i_pyUSD;
+    }
 
     function getUserByOfferId(uint64 offerId) public view returns (address) {
         return offers[offerId].buyer;
@@ -283,7 +310,6 @@ contract OrderContract is ReentrancyGuard{
     }
 
     function getMerchantOrderDetails(address merchant, uint64 orderId) external view returns (Offer memory) {
-        // Check if the order belongs to the merchant
         if (offers[orderId].seller != merchant) {
             revert OrderContract__NotOrderByMerchanProvided();
         }
@@ -294,13 +320,6 @@ contract OrderContract is ReentrancyGuard{
         return i_a3aToken;
     }
 
-    // User order query functions for backend integration
-    
-    /**
-     * @notice Get all order IDs for a specific user
-     * @param user The address to query orders for
-     * @return Array of order IDs belonging to the user
-     */
     function getUserOrderIds(address user) external view returns (uint64[] memory) {
         return userOrderIds[user];
     }
@@ -332,8 +351,6 @@ contract OrderContract is ReentrancyGuard{
         // require(userOrders[user][orderId], "Order does not belong to user");
         return offers[orderId].status;
     }
-  
-    
     
     /**
      * @notice Get complete order details for a user's specific order
@@ -347,9 +364,6 @@ contract OrderContract is ReentrancyGuard{
         }
         return offers[orderId];
     }
-    
-   
-   
 
 
 }

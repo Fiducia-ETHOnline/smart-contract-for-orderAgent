@@ -28,14 +28,22 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 
 contract A3AToken is ERC20Burnable, Ownable {
-    /* Erors */
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
     error A3AToken__BurnAmountMustBeMoreThanZero();
     error A3AToken__BurnAmountMustBeMoreThanBalance();
     error A3AToken__MintToTheZeroAddress();
     error A3AToken__MintAmountMustBeMoreThanZero();
-
+    
+    /*//////////////////////////////////////////////////////////////
+                               FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
     constructor() ERC20("A3A Token", "A3A") Ownable(msg.sender) {}
 
+    /*//////////////////////////////////////////////////////////////
+                           EXTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
     function burn(uint256 _amount) public override onlyOwner {
         uint256 balance = balanceOf(msg.sender);
 

@@ -19,7 +19,7 @@ contract HelperConfig is Script {
     function getSepoliaEthConfig() public view returns (NetworkConfig memory) {
         return NetworkConfig({
           pyUSD: 0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9,
-          agentController: address(5), // replace with actual address
+          agentController: 0x85688Cd38591e25D7e037ebc1028FF7De1Ec5AA9, // replace with actual address
           deployerKey: vm.envUint("PRIVATE_KEY")
         });
     }
