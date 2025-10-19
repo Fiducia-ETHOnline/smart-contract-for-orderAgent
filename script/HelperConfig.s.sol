@@ -18,7 +18,7 @@ contract HelperConfig is Script {
     function getSepoliaEthConfig() public view returns (NetworkConfig memory) {
         return NetworkConfig({
           pyUSD: 0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9,
-          agentController: 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc, // replace with actual address
+          agentController: vm.envAddress("AGENT_ADDRESS"), // replace with actual address
           deployerKey: vm.envUint("PRIVATE_KEY")
         });
     }
@@ -29,12 +29,15 @@ contract HelperConfig is Script {
         }
         vm.startBroadcast();
         ERC20Mock pyUSD = new ERC20Mock();
-        pyUSD.mint(vm.envAddress("PUBLIC_KEY"), 100 ether);
-        
+        address[] memory test_accounts = vm.envAddress("PUBLIC_KEYS",',');
+        for (uint256 i = 0; i < test_accounts.length; i++) {
+            pyUSD.mint(test_accounts[i], 100 ether);
+            
+        }  
         vm.stopBroadcast();
         return NetworkConfig({
             pyUSD: address(pyUSD),
-            agentController: address(5),
+            agentController: vm.envAddress("AGENT_ADDRESS"),
             deployerKey: vm.envUint("DEFAULT_ANVIL_KEY")
         });
     

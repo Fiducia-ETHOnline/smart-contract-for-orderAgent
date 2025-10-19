@@ -22,9 +22,11 @@ contract DeployOrderContract is Script {
         agentController,  pyUSD, address(token) // Replace with actual pyUSD token address
         );
         if (block.chainid == 31337) {
-            
-            token.mint(vm.envAddress("PUBLIC_KEY"), 1000000 ether);
-            
+            address[] memory test_accounts = vm.envAddress("PUBLIC_KEYS",',');
+            for (uint256 i = 0; i < test_accounts.length; i++) {
+                token.mint(test_accounts[i], 1000000 ether);
+                
+            }            
         }
         token.transferOwnership(address(orderContract));
 
