@@ -13,12 +13,12 @@ contract DeployOrderContract is Script {
     function run() public returns (OrderContract, HelperConfig, A3AToken) {
         HelperConfig helperConfig = new HelperConfig();
         
-        (address pyUSD, address agentController, uint256 deployerKey )= helperConfig.activeNetworkConfig();
+        (address pyUSD, address agentController, uint256 deployerKey, address owner)= helperConfig.activeNetworkConfig();
         
         vm.startBroadcast(deployerKey);
         A3AToken token = new A3AToken();
         OrderContract orderContract = new OrderContract(
-        agentController,  pyUSD, address(token) // Replace with actual pyUSD token address
+        agentController,  pyUSD, address(token), owner // Replace with actual pyUSD token address
         );
         if (block.chainid == 31337) {
             

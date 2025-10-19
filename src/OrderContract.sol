@@ -28,6 +28,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {A3AToken} from "./A3Atoken.sol";
 
 contract OrderContract is ReentrancyGuard{
+    
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -40,6 +41,7 @@ contract OrderContract is ReentrancyGuard{
     error OrderContract__EnoughTimeHasNotPassed();
     error OrderContract__CannotProposeOrderAnswerInCurrentState();
     error OrderContract__NotOrderByMerchanProvided();
+    error OrderContract__onlyOwnerCanWithdrawFunds();
 
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
@@ -73,6 +75,7 @@ contract OrderContract is ReentrancyGuard{
     address private immutable i_agentController; // Address of the agent controller
     address private immutable i_pyUSD; // Address of the pyUSD token contract
     address private immutable i_a3aToken; // Address of the A3A token contract
+    address private immutable i_owner; // Owner of the contract. Address that can wuithdraw funds.
     
     mapping(uint64 => Offer) public offers;
     mapping(address => uint64[]) private userOrderIds;
@@ -86,6 +89,7 @@ contract OrderContract is ReentrancyGuard{
     event OrderConfirmed(address indexed user, uint64 indexed offerId, uint256 indexed amountPaid);
     event orderFinalized(address indexed user, uint64 indexed offerId);
    
+
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
     //////////////////////////////////////////////////////////////*/
@@ -102,18 +106,28 @@ contract OrderContract is ReentrancyGuard{
             revert OrderContract__userHasNoAccessToOffer();
         }
         _;
+    }
+
+    modifier onlyOwner() {
+        if (msg.sender != i_owner) {
+            revert OrderContract__onlyOwnerCanWithdrawFunds();
+        }
+       _;
         
     }
+
 
     /*//////////////////////////////////////////////////////////////
                                FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    constructor(address agentControllerAddress, address pyUSDAddress, address a3aTokenAddress) {
+    constructor(address agentControllerAddress, address pyUSDAddress, address a3aTokenAddress, address owner) {
         // Initialization logic if needed
         i_agentController = agentControllerAddress;
         i_pyUSD = pyUSDAddress;
         i_a3aToken = a3aTokenAddress;
+        i_owner = owner;
     }
+
 
     /*//////////////////////////////////////////////////////////////
                            EXTERNAL FUNCTIONS
@@ -192,7 +206,7 @@ contract OrderContract is ReentrancyGuard{
 
      /**
      * @notice Finalize the order by transferring the paid amount to the seller.
-     * Marks order as Completed. Only our order agent should be able to confirm. To prevent fraud.
+     * Marks order as Completed. Only our order agent should be able to confirm.
      * @param offerId The ID of the offer to finalize
      * @return bool indicating successful finalization
      */
@@ -245,6 +259,13 @@ contract OrderContract is ReentrancyGuard{
             revert OrderContract__ERC20TransferFailed();
         }
         A3AToken(i_a3aToken).mint(msg.sender, (PyUsdAmount*ADDITIONAL_PRECISION)*100);
+    }
+
+    function withdrawPyUSD(uint256 amount) external onlyOwner nonReentrant {
+        bool success = ERC20(i_pyUSD).transfer(msg.sender, amount);
+        if (!success) {
+            revert OrderContract__ERC20TransferFailed();
+        }
     }
      
 
@@ -323,6 +344,10 @@ contract OrderContract is ReentrancyGuard{
     function getUserOrderIds(address user) external view returns (uint64[] memory) {
         return userOrderIds[user];
     }
+
+    function getOwner() external view returns (address) {
+        return i_owner;
+    }   
     
     /**
      * @notice Check if a user has a specific order

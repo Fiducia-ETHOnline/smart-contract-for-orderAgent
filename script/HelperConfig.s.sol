@@ -12,6 +12,7 @@ contract HelperConfig is Script {
         address pyUSD;
         address agentController;
         uint256 deployerKey;
+        address owner;
     }
 
     NetworkConfig public activeNetworkConfig;
@@ -20,7 +21,8 @@ contract HelperConfig is Script {
         return NetworkConfig({
           pyUSD: 0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9,
           agentController: 0x85688Cd38591e25D7e037ebc1028FF7De1Ec5AA9, // replace with actual address
-          deployerKey: vm.envUint("PRIVATE_KEY")
+          deployerKey: vm.envUint("PRIVATE_KEY"),
+          owner: 0xcf19f5d480390A638f3c6986323892Bc1D08125e
         });
     }
 
@@ -36,7 +38,8 @@ contract HelperConfig is Script {
         return NetworkConfig({
             pyUSD: address(pyUSD),
             agentController: address(5),
-            deployerKey: vm.envUint("DEFAULT_ANVIL_KEY")
+            deployerKey: vm.envUint("DEFAULT_ANVIL_KEY"),
+            owner: 0xcf19f5d480390A638f3c6986323892Bc1D08125e
         });
     
 }

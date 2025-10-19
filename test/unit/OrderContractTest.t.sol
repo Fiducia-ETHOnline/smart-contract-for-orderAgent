@@ -15,6 +15,7 @@ contract OrderContractTest is Test {
     address pyUSD;
     address addressController;
     A3AToken a3aToken;
+    address owner;
 
     
     bytes32 constant PROMPT_HASH = keccak256(abi.encodePacked("Test Prompt"));
@@ -35,7 +36,7 @@ contract OrderContractTest is Test {
     function setUp() public {
         DeployOrderContract deployer = new DeployOrderContract();
         (orderContract, helperConfig, a3aToken) = deployer.run();
-        (pyUSD, addressController, ) = helperConfig.activeNetworkConfig();
+        (pyUSD, addressController,,owner) = helperConfig.activeNetworkConfig();
         ERC20Mock(pyUSD).mint(USER, DEFAULT_MINT_AMOUNT);
         ERC20Mock(pyUSD).mint(USER2, DEFAULT_MINT_AMOUNT);
 
@@ -332,8 +333,36 @@ contract OrderContractTest is Test {
         assertEq(offer.seller, SELLER);
         assertEq(uint8(offer.status), uint8(OrderContract.OrderStatus.Proposed));
     }
-    
 
+
+    /*//////////////////////////////////////////////////////////////
+                          WITHDRAW PYUSD TESTS
+    //////////////////////////////////////////////////////////////*/
+    function testOnlyOwnerCanWithdrawFunds() public orderConfirmed {
+        // Arrange
+        uint64 offerId = 1;
+        // Act / Assert
+        vm.prank(address(0x123));
+        vm.expectRevert(OrderContract.OrderContract__onlyOwnerCanWithdrawFunds.selector);
+        orderContract.withdrawPyUSD(offerId);
+    }
+
+    function testWithdrawFunds() public orderConfirmed {
+        // Arrange
+        
+        
+        uint256 contractBalanceBefore = ERC20Mock(pyUSD).balanceOf(address(orderContract));
+        uint256 ownerBalanceBefore = ERC20Mock(pyUSD).balanceOf(owner);
+        uint256 amountToWithdraw = 0.5e6;
+        // Act
+        vm.prank(owner);
+        orderContract.withdrawPyUSD(amountToWithdraw);
+        uint256 contractBalanceAfter = ERC20Mock(pyUSD).balanceOf(address(orderContract));
+        uint256 ownerBalanceAfter = ERC20Mock(pyUSD).balanceOf(owner);
+        // Assert
+        assertEq(contractBalanceBefore - contractBalanceAfter, amountToWithdraw);
+        assertEq(ownerBalanceAfter - ownerBalanceBefore, amountToWithdraw);
+    }
     /*//////////////////////////////////////////////////////////////
                        USER ORDER MAPPINGS TESTS
     //////////////////////////////////////////////////////////////*/
