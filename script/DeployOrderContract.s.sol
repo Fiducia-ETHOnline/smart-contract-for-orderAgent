@@ -23,7 +23,7 @@ contract DeployOrderContract is Script {
         agentController,  pyUSD, address(token), owner // Replace with actual pyUSD token address
         );
         if (block.chainid == 31337) {
-            
+            merchantNft.mintNft(1);
             token.mint(vm.envAddress("PUBLIC_KEY"), 1000000 ether);
             
         }

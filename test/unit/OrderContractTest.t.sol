@@ -394,6 +394,12 @@ contract OrderContractTest is Test {
         assertFalse(isMerchant);
     }
 
+    function testMerchantGetsMintedNftBalance() public view {
+        bool merchant = merchantNft.isMerchant(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266,1);
+        // Assert
+        assertTrue(merchant);
+    }
+
 
     /*//////////////////////////////////////////////////////////////
                        USER ORDER MAPPINGS TESTS
