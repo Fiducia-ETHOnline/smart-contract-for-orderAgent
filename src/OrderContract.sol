@@ -168,14 +168,14 @@ contract OrderContract is ReentrancyGuard{
             revert OrderContract__OrderCannotBeConfirmedInCurrentState();
         }
         // update amount paid for the offer by the user
-        uint256 amountToPay = offers[offerId].price + AGENT_FEE;
+        uint256 amountToPay = offers[offerId].price;
     
         offers[offerId].paid = amountToPay;
         offers[offerId].status = OrderStatus.Confirmed;
        
         offers[offerId].timestamp = block.timestamp;
         bool success= ERC20(i_pyUSD).transferFrom(msg.sender, address(this), amountToPay);
-        
+        _burnA3A(100 ether, msg.sender); // Burn 5 A3A tokens from user as confirmation fee.
         if (!success) {
             revert OrderContract__ERC20TransferFailed();
         }
@@ -258,16 +258,14 @@ contract OrderContract is ReentrancyGuard{
         if (!success) {
             revert OrderContract__ERC20TransferFailed();
         }
+        bool transferSuccess = ERC20(i_pyUSD).transfer(i_owner,PyUsdAmount);
+        if (!transferSuccess) {
+            revert OrderContract__ERC20TransferFailed();
+        }
         A3AToken(i_a3aToken).mint(msg.sender, (PyUsdAmount*ADDITIONAL_PRECISION)*100);
     }
 
-    function withdrawPyUSD(uint256 amount) external onlyOwner nonReentrant {
-        bool success = ERC20(i_pyUSD).transfer(msg.sender, amount);
-        if (!success) {
-            revert OrderContract__ERC20TransferFailed();
-        }
-    }
-     
+
 
     /*//////////////////////////////////////////////////////////////
                      INTERNAL AND PRIVATE FUNCTIONS

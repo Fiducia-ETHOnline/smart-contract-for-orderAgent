@@ -148,7 +148,7 @@ contract OrderContractTest is Test {
         // Arrange
         uint64 offerId = 1;
         uint256 priceForOffer = 5 ether;
-        uint256 expectedAmountPaid = priceForOffer + orderContract.getAgentFee(); // AGENT_FEE i 1 ether
+        uint256 expectedAmountPaid = priceForOffer; 
         uint256 expectedTimeStamp = block.timestamp;
         // Act
         vm.startPrank(USER);
@@ -165,7 +165,7 @@ contract OrderContractTest is Test {
         // Arrange
         uint64 offerId = 1;
         uint256 priceForOffer = 5 ether;
-        uint256 expectedAmountPaid = priceForOffer + orderContract.getAgentFee(); // AGENT_FEE is 1 ether
+        uint256 expectedAmountPaid = priceForOffer;
         
        
         // Act
@@ -186,6 +186,22 @@ contract OrderContractTest is Test {
         vm.prank(USER);
         vm.expectRevert(OrderContract.OrderContract__OrderCannotBeConfirmedInCurrentState.selector);
         orderContract.confirmOrder(offerId);
+    }
+
+    function testConfirmOrderBurnsA3ATokens() public proposeOrderForUser orderProposedAnsweredByAgent {
+        // Arrange
+        uint64 offerId = 1;
+        uint256 priceForOffer = 5 ether;
+        uint256 userA3ABalanceBefore = a3aToken.balanceOf(USER);
+        uint256 expectedA3ABurned = 100 ether;
+        // Act
+        vm.startPrank(USER);
+        ERC20Mock(pyUSD).approve(address(orderContract), priceForOffer);
+        orderContract.confirmOrder(offerId);
+        vm.stopPrank();
+        uint256 userA3ABalanceAfter = a3aToken.balanceOf(USER);
+        // Assert
+        assertEq(userA3ABalanceBefore - userA3ABalanceAfter, expectedA3ABurned);
     }
 
 
@@ -271,7 +287,7 @@ contract OrderContractTest is Test {
         // Arrange
         uint64 offerId = 1;
         uint256 sellerBalanceBefore = ERC20Mock(pyUSD).balanceOf(SELLER);
-        uint256 expectedAmountPaid = 5 ether + orderContract.getAgentFee();
+        uint256 expectedAmountPaid = 5 ether;
         // Act
         vm.prank(addressController);
         orderContract.finalizeOrder(offerId);   
@@ -334,35 +350,6 @@ contract OrderContractTest is Test {
         assertEq(uint8(offer.status), uint8(OrderContract.OrderStatus.Proposed));
     }
 
-
-    /*//////////////////////////////////////////////////////////////
-                          WITHDRAW PYUSD TESTS
-    //////////////////////////////////////////////////////////////*/
-    function testOnlyOwnerCanWithdrawFunds() public orderConfirmed {
-        // Arrange
-        uint64 offerId = 1;
-        // Act / Assert
-        vm.prank(address(0x123));
-        vm.expectRevert(OrderContract.OrderContract__onlyOwnerCanWithdrawFunds.selector);
-        orderContract.withdrawPyUSD(offerId);
-    }
-
-    function testWithdrawFunds() public orderConfirmed {
-        // Arrange
-        
-        
-        uint256 contractBalanceBefore = ERC20Mock(pyUSD).balanceOf(address(orderContract));
-        uint256 ownerBalanceBefore = ERC20Mock(pyUSD).balanceOf(owner);
-        uint256 amountToWithdraw = 0.5e6;
-        // Act
-        vm.prank(owner);
-        orderContract.withdrawPyUSD(amountToWithdraw);
-        uint256 contractBalanceAfter = ERC20Mock(pyUSD).balanceOf(address(orderContract));
-        uint256 ownerBalanceAfter = ERC20Mock(pyUSD).balanceOf(owner);
-        // Assert
-        assertEq(contractBalanceBefore - contractBalanceAfter, amountToWithdraw);
-        assertEq(ownerBalanceAfter - ownerBalanceBefore, amountToWithdraw);
-    }
     /*//////////////////////////////////////////////////////////////
                        USER ORDER MAPPINGS TESTS
     //////////////////////////////////////////////////////////////*/
