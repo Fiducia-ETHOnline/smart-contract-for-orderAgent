@@ -8,6 +8,8 @@ import {HelperConfig} from "script/HelperConfig.s.sol";
 import {DeployOrderContract} from "script/DeployOrderContract.s.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 import {A3AToken} from "../../src/A3Atoken.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {MerchantNft} from "../../src/MerchantNft.sol";
 
 contract OrderContractTest is Test {
     OrderContract orderContract;
@@ -16,6 +18,7 @@ contract OrderContractTest is Test {
     address addressController;
     A3AToken a3aToken;
     address owner;
+    MerchantNft merchantNft;
 
     
     bytes32 constant PROMPT_HASH = keccak256(abi.encodePacked("Test Prompt"));
@@ -35,7 +38,7 @@ contract OrderContractTest is Test {
 
     function setUp() public {
         DeployOrderContract deployer = new DeployOrderContract();
-        (orderContract, helperConfig, a3aToken) = deployer.run();
+        (orderContract, helperConfig, a3aToken, merchantNft) = deployer.run();
         (pyUSD, addressController,,owner) = helperConfig.activeNetworkConfig();
         ERC20Mock(pyUSD).mint(USER, DEFAULT_MINT_AMOUNT);
         ERC20Mock(pyUSD).mint(USER2, DEFAULT_MINT_AMOUNT);
@@ -349,6 +352,48 @@ contract OrderContractTest is Test {
         assertEq(offer.seller, SELLER);
         assertEq(uint8(offer.status), uint8(OrderContract.OrderStatus.Proposed));
     }
+
+    /*//////////////////////////////////////////////////////////////
+                           MERCHANT NFT TESTS
+    //////////////////////////////////////////////////////////////*/
+    function testMerchantNftMintingAndOwnership() public {
+        // Arrange
+        uint256 merchantId = 1;
+        // Act
+        vm.prank(SELLER);
+        merchantNft.mintNft(merchantId);
+        // Assert
+        address ownerOfNft = merchantNft.ownerOf(merchantId);
+        assertEq(ownerOfNft, SELLER);
+        bool isMerchant = merchantNft.isMerchant(SELLER, merchantId);
+        assertTrue(isMerchant);
+
+    }
+
+
+    function testMerchantNftRevertsOnDuplicateMint() public {
+        // Arrange
+        uint256 merchantId = 1;
+        vm.prank(SELLER);
+        merchantNft.mintNft(merchantId);
+        // Act / Assert
+        vm.prank(USER);
+        vm.expectRevert(MerchantNft.MerchantNft__MerchantIdAlreadyMinted.selector);
+        merchantNft.mintNft(merchantId);
+
+    }
+
+    function testMerchantNftReturnsFalseIfNotOwner() public {
+        // Arrange
+        uint256 merchantId = 1;
+        vm.prank(SELLER);
+        merchantNft.mintNft(merchantId);
+        // Act
+        bool isMerchant = merchantNft.isMerchant(USER, merchantId);
+        // Assert
+        assertFalse(isMerchant);
+    }
+
 
     /*//////////////////////////////////////////////////////////////
                        USER ORDER MAPPINGS TESTS
