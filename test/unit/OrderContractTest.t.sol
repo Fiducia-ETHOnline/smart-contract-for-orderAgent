@@ -358,7 +358,7 @@ contract OrderContractTest is Test {
     //////////////////////////////////////////////////////////////*/
     function testMerchantNftMintingAndOwnership() public {
         // Arrange
-        uint256 merchantId = 1;
+        uint256 merchantId = 2;
         // Act
         vm.prank(SELLER);
         merchantNft.mintNft(merchantId);
@@ -373,7 +373,7 @@ contract OrderContractTest is Test {
 
     function testMerchantNftRevertsOnDuplicateMint() public {
         // Arrange
-        uint256 merchantId = 1;
+        uint256 merchantId = 2;
         vm.prank(SELLER);
         merchantNft.mintNft(merchantId);
         // Act / Assert
@@ -385,7 +385,7 @@ contract OrderContractTest is Test {
 
     function testMerchantNftReturnsFalseIfNotOwner() public {
         // Arrange
-        uint256 merchantId = 1;
+        uint256 merchantId = 2;
         vm.prank(SELLER);
         merchantNft.mintNft(merchantId);
         // Act
@@ -398,6 +398,25 @@ contract OrderContractTest is Test {
         bool merchant = merchantNft.isMerchant(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266,1);
         // Assert
         assertTrue(merchant);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           CANCEL ORDER TESTS
+    //////////////////////////////////////////////////////////////*/
+    function testCancelOrderUpdatesState() public orderConfirmed {
+        // Arrange
+        uint256 userBalanceBefore = ERC20Mock(pyUSD).balanceOf(USER);
+        uint64 offerId = 1;
+        vm.warp(block.timestamp + 700);
+        vm.roll(1); // Move time forward to allow cancellation
+        // Act
+        vm.prank(USER);
+        orderContract.cancelOrder(offerId);
+        // Assert
+        uint256 userBalanceAfter = ERC20Mock(pyUSD).balanceOf(USER);
+        OrderContract.OrderStatus status = orderContract.getOfferStatus(offerId);
+        assertEq(userBalanceAfter - userBalanceBefore, orderContract.getAmountPaid(offerId));
+        assertEq(uint8(status), uint8(OrderContract.OrderStatus.Cancelled));
     }
 
 

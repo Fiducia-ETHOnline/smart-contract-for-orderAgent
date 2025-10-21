@@ -233,7 +233,7 @@ contract OrderContract is ReentrancyGuard{
      * @notice Cancel the order if enough time has passed since confirmation. Marks order as Cancelled. Only user who proposed and confirmed the order can cancel it.
      * @param offerId The ID of the offer to cancel
      */
-    function cancelOrder(uint64 offerId) external nonReentrant onlyUserWithOffer(offerID) {
+    function cancelOrder(uint64 offerId) external nonReentrant onlyUserWithOffer(offerId) {
         if (block.timestamp - offers[offerId].timestamp < HOLD_UNTIL) {
             revert OrderContract__EnoughTimeHasNotPassed();
         }
