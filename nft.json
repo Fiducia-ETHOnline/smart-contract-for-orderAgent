@@ -1,0 +1,15 @@
+{
+  "name": "A3A Merchant",
+  "description": "This NFT verifies access to the A3A merchant interface.",
+  "image": "ipfs://<your_image_cid_here>", 
+  "attributes": [
+    {
+      "trait_type": "Role",
+      "value": "Merchant"
+    },
+    {
+      "trait_type": "Access Level",
+      "value": "Verified"
+    }
+  ]
+}

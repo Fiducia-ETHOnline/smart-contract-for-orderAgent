@@ -360,8 +360,8 @@ contract OrderContractTest is Test {
         // Arrange
         uint256 merchantId = 2;
         // Act
-        vm.prank(SELLER);
-        merchantNft.mintNft(merchantId);
+        vm.prank(owner);
+        merchantNft.mintNft(merchantId, SELLER);
         // Assert
         address ownerOfNft = merchantNft.ownerOf(merchantId);
         assertEq(ownerOfNft, SELLER);
@@ -374,30 +374,33 @@ contract OrderContractTest is Test {
     function testMerchantNftRevertsOnDuplicateMint() public {
         // Arrange
         uint256 merchantId = 2;
-        vm.prank(SELLER);
-        merchantNft.mintNft(merchantId);
+        vm.prank(owner);
+        merchantNft.mintNft(merchantId, SELLER);
         // Act / Assert
-        vm.prank(USER);
+        vm.prank(owner);
         vm.expectRevert(MerchantNft.MerchantNft__MerchantIdAlreadyMinted.selector);
-        merchantNft.mintNft(merchantId);
+        merchantNft.mintNft(merchantId, USER);
 
     }
 
     function testMerchantNftReturnsFalseIfNotOwner() public {
         // Arrange
         uint256 merchantId = 2;
-        vm.prank(SELLER);
-        merchantNft.mintNft(merchantId);
+        vm.prank(owner);
+        merchantNft.mintNft(merchantId, SELLER);
         // Act
         bool isMerchant = merchantNft.isMerchant(USER, merchantId);
         // Assert
         assertFalse(isMerchant);
     }
 
-    function testMerchantGetsMintedNftBalance() public view {
-        bool merchant = merchantNft.isMerchant(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266,1);
-        // Assert
-        assertTrue(merchant);
+    function testMerchantNftOnlyOwnerCanMint() public {
+        // Arrange
+        uint256 merchantId = 2;
+        // Act / Assert
+        vm.prank(USER);
+        vm.expectRevert(MerchantNft.MerchantNft__OnlyOwnerCanCall.selector);
+        merchantNft.mintNft(merchantId, USER);
     }
 
     /*//////////////////////////////////////////////////////////////

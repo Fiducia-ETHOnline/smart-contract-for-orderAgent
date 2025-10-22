@@ -18,12 +18,11 @@ contract DeployOrderContract is Script {
         
         vm.startBroadcast(deployerKey);
         A3AToken token = new A3AToken();
-        MerchantNft merchantNft = new MerchantNft();
+        MerchantNft merchantNft = new MerchantNft(owner);
         OrderContract orderContract = new OrderContract(
         agentController,  pyUSD, address(token), owner // Replace with actual pyUSD token address
         );
         if (block.chainid == 31337) {
-            merchantNft.mintNft(1);
             token.mint(vm.envAddress("PUBLIC_KEY"), 1000000 ether);
             
         }
