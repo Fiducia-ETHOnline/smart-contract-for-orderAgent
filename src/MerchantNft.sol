@@ -82,6 +82,13 @@ contract MerchantNft is ERC721 {
         return "ipfs://bafkreidn7tkkov6iykgq5kb7zbfb77tg7lza5exutuufoozebeg7gwz22u";
     }
 
+    function ownerBurn(uint256 tokenId) external onlyOwner {
+        if (_ownerOf(tokenId) == address(0)) {
+            revert MerchantNft__TokenDoesNotExist();
+        }
+        _burn(tokenId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             GETTER FUNCTIONS
     //////////////////////////////////////////////////////////////*/

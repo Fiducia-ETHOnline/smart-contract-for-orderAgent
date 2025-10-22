@@ -403,6 +403,31 @@ contract OrderContractTest is Test {
         merchantNft.mintNft(merchantId, USER);
     }
 
+    function testMerchantNftOwnerBurn() public {
+        // Arrange
+        uint256 merchantId = 2;
+        vm.prank(owner);
+        merchantNft.mintNft(merchantId, SELLER);
+        // Act
+        vm.prank(owner);
+        merchantNft.ownerBurn(merchantId);
+        // Assert
+        vm.prank(owner);
+        vm.expectRevert(MerchantNft.MerchantNft__TokenDoesNotExist.selector);
+        merchantNft.ownerBurn(merchantId);
+    }
+
+    function testMerchantNftOnlyOwnerCanBurn() public {
+        // Arrange
+        uint256 merchantId = 2;
+        vm.prank(owner);
+        merchantNft.mintNft(merchantId, SELLER);
+        // Act / Assert
+        vm.prank(USER);
+        vm.expectRevert(MerchantNft.MerchantNft__OnlyOwnerCanCall.selector);
+        merchantNft.ownerBurn(merchantId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                            CANCEL ORDER TESTS
     //////////////////////////////////////////////////////////////*/
