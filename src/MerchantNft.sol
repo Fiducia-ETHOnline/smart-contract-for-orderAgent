@@ -32,11 +32,26 @@ contract MerchantNft is ERC721 {
     error MerchantNft__MerchantIdAlreadyMinted();
     error MerchantNft__TokenDoesNotExist();
     error MerchantNft__OnlyOwnerCanCall();
+    error MerchantNft__AlreadyApplied();
+    error MerchantNft__AlreadyHasNFT();
+    error MerchantNft__NoPendingApplication();
+    error MerchantNft__NotTokenOwner();
+    error MerchantNft__ZeroAddress();
+
+    enum AppStatus { None, Pending, Processed, Rejected }
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
     address private immutable i_owner;
+    uint256 private _nextId = 1;
+    mapping(address => AppStatus) public applicationStatus;
+
+
+
+    event MerchantApplied(address indexed applicant);
+    event MerchantApproved(address indexed applicant, uint256 indexed tokenId);
+    event MerchantRejected(address indexed applicant);
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -58,13 +73,33 @@ contract MerchantNft is ERC721 {
     /*//////////////////////////////////////////////////////////////
                      EXTERNAL AND PUBLIC FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    function mintNft(uint256 merchantId, address to) external onlyOwner {
-        if (_ownerOf(merchantId) != address(0)) {
-            revert MerchantNft__MerchantIdAlreadyMinted();
-        }
-        _safeMint(to, merchantId);
+     function applyAsMerchant() external {
+        if (applicationStatus[msg.sender] != AppStatus.None) revert MerchantNft__AlreadyApplied();
         
+
+        applicationStatus[msg.sender] = AppStatus.Pending;
+        emit MerchantApplied(msg.sender);
     }
+
+     function approveApplicant(address applicant) external onlyOwner {
+        if (applicant == address(0)) revert MerchantNft__ZeroAddress();
+        if (applicationStatus[applicant] != AppStatus.Pending) revert MerchantNft__NoPendingApplication();
+        
+
+        uint256 tokenId = _nextId++;
+        _safeMint(applicant, tokenId);
+
+        applicationStatus[applicant] = AppStatus.Processed;
+
+        emit MerchantApproved(applicant, tokenId);
+    }
+
+    function rejectApplicant(address applicant) external onlyOwner {
+        if (applicationStatus[applicant] != AppStatus.Pending) revert MerchantNft__NoPendingApplication();
+        applicationStatus[applicant] = AppStatus.Rejected;
+        emit MerchantRejected(applicant);
+    }
+
 
     function isMerchant(address wallet, uint256 merchantId) external view returns (bool) {
         if (_ownerOf(merchantId) == wallet) {
@@ -95,4 +130,14 @@ contract MerchantNft is ERC721 {
     function getOwner() external view returns (address) {
         return i_owner;
     }
+
+    function getNextId() external view returns (uint256) {
+        return _nextId;
+    }
+
+    function getApplicationStatus(address applicant) external view returns (AppStatus) {
+        return applicationStatus[applicant];
+    }
+
+
 }
