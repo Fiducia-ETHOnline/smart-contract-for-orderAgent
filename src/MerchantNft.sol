@@ -73,7 +73,7 @@ contract MerchantNft is ERC721 {
     /*//////////////////////////////////////////////////////////////
                      EXTERNAL AND PUBLIC FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-     function applyAsMerchant() external {
+     function applyForMerchantNft() external {
         if (applicationStatus[msg.sender] != AppStatus.None) revert MerchantNft__AlreadyApplied();
         
 

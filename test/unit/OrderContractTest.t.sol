@@ -356,76 +356,116 @@ contract OrderContractTest is Test {
     /*//////////////////////////////////////////////////////////////
                            MERCHANT NFT TESTS
     //////////////////////////////////////////////////////////////*/
-    function testMerchantNftMintingAndOwnership() public {
-        // Arrange
-        uint256 merchantId = 2;
-        // Act
+    modifier merchantNftApplied() {
+        vm.prank(USER);
+        merchantNft.applyForMerchantNft();
+        _;
+    }
+
+    modifier merchantNftApproved() {
+        vm.prank(USER);
+        merchantNft.applyForMerchantNft();
         vm.prank(owner);
-        merchantNft.mintNft(merchantId, SELLER);
+        merchantNft.approveApplicant(USER);
+        _;
+    }
+    
+    
+    function testMerchanNftApplication() public {
+        // Arrange
+        vm.prank(USER);
+        merchantNft.applyForMerchantNft();
+        // Act
+        MerchantNft.AppStatus status = merchantNft.getApplicationStatus(USER);
         // Assert
-        address ownerOfNft = merchantNft.ownerOf(merchantId);
-        assertEq(ownerOfNft, SELLER);
-        bool isMerchant = merchantNft.isMerchant(SELLER, merchantId);
-        assertTrue(isMerchant);
-
+        assertEq(uint8(status), uint8(MerchantNft.AppStatus.Pending));
     }
 
 
-    function testMerchantNftRevertsOnDuplicateMint() public {
-        // Arrange
-        uint256 merchantId = 2;
-        vm.prank(owner);
-        merchantNft.mintNft(merchantId, SELLER);
-        // Act / Assert
-        vm.prank(owner);
-        vm.expectRevert(MerchantNft.MerchantNft__MerchantIdAlreadyMinted.selector);
-        merchantNft.mintNft(merchantId, USER);
-
-    }
-
-    function testMerchantNftReturnsFalseIfNotOwner() public {
-        // Arrange
-        uint256 merchantId = 2;
-        vm.prank(owner);
-        merchantNft.mintNft(merchantId, SELLER);
+    function testMerchantNftApprove() public merchantNftApplied {
         // Act
-        bool isMerchant = merchantNft.isMerchant(USER, merchantId);
+        vm.prank(owner);
+        merchantNft.approveApplicant(USER);
+        // Assert
+        MerchantNft.AppStatus status = merchantNft.getApplicationStatus(USER);
+        assertEq(uint8(status), uint8(MerchantNft.AppStatus.Processed));
+        uint256 tokenId = 1;
+        address nftOwner = merchantNft.ownerOf(tokenId);
+        assertEq(nftOwner, USER);
+      
+
+    }
+
+    function testMerchantNftReturnsFalseIfNotOwner() public merchantNftApproved{
+        uint256 merchantId = 1;
+        bool isMerchant = merchantNft.isMerchant(USER2, merchantId);
         // Assert
         assertFalse(isMerchant);
     }
 
-    function testMerchantNftOnlyOwnerCanMint() public {
+    function testMerchantNftOnlyOwnerCanApprove() public {
         // Arrange
-        uint256 merchantId = 2;
+        vm.prank(USER);
+        merchantNft.applyForMerchantNft();
         // Act / Assert
         vm.prank(USER);
         vm.expectRevert(MerchantNft.MerchantNft__OnlyOwnerCanCall.selector);
-        merchantNft.mintNft(merchantId, USER);
+        merchantNft.approveApplicant(USER);
     }
+       
 
-    function testMerchantNftOwnerBurn() public {
+    function testMerchantNftOwnerBurn() public merchantNftApproved {
         // Arrange
-        uint256 merchantId = 2;
-        vm.prank(owner);
-        merchantNft.mintNft(merchantId, SELLER);
+        uint256 merchantId = 1;
         // Act
         vm.prank(owner);
         merchantNft.ownerBurn(merchantId);
         // Assert
-        vm.prank(owner);
-        vm.expectRevert(MerchantNft.MerchantNft__TokenDoesNotExist.selector);
-        merchantNft.ownerBurn(merchantId);
+        vm.expectRevert();
+        merchantNft.ownerOf(merchantId);
+       
     }
 
-    function testMerchantNftOnlyOwnerCanBurn() public {
+    function testMerchantNftOnlyOwnerCanBurn() public merchantNftApproved {
         // Arrange
-        uint256 merchantId = 2;
-        vm.prank(owner);
-        merchantNft.mintNft(merchantId, SELLER);
+        uint256 merchantId = 1;
         // Act / Assert
         vm.prank(USER);
         vm.expectRevert(MerchantNft.MerchantNft__OnlyOwnerCanCall.selector);
         merchantNft.ownerBurn(merchantId);
+    }
+
+    function testMerchantNftApproveCanOnlyPendingApplications() public {
+        // Arrange
+        vm.prank(USER);
+        merchantNft.applyForMerchantNft();
+        vm.prank(owner);
+        merchantNft.approveApplicant(USER);
+        // Act / Assert
+        vm.prank(owner);
+        vm.expectRevert(MerchantNft.MerchantNft__NoPendingApplication.selector);
+        merchantNft.approveApplicant(USER);
+    }
+
+    function testMerchantNftRejectApplicant() public merchantNftApplied {
+        // Act
+        vm.prank(owner);
+        merchantNft.rejectApplicant(USER);
+        // Assert
+        MerchantNft.AppStatus status = merchantNft.getApplicationStatus(USER);
+        assertEq(uint8(status), uint8(MerchantNft.AppStatus.Rejected));
+    }
+
+    function testMerchantNftRejectCanOnlyPendingApplications() public {
+        // Arrange
+        vm.prank(USER);
+        merchantNft.applyForMerchantNft();
+        vm.prank(owner);
+        merchantNft.rejectApplicant(USER);
+        // Act / Assert
+        vm.prank(owner);
+        vm.expectRevert(MerchantNft.MerchantNft__NoPendingApplication.selector);
+        merchantNft.rejectApplicant(USER);
     }
 
     /*//////////////////////////////////////////////////////////////
