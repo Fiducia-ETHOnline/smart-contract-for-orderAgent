@@ -43,6 +43,9 @@ contract OrderContract is ReentrancyGuard{
     error OrderContract__CannotProposeOrderAnswerInCurrentState();
     error OrderContract__NotOrderByMerchanProvided();
     error OrderContract__onlyOwnerCanWithdrawFunds();
+    error OrderContract__OrderCannotBeDisputedInCurrentState();
+    
+    
 
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
@@ -52,7 +55,8 @@ contract OrderContract is ReentrancyGuard{
         Confirmed,
         InProgress,
         Completed,
-        Cancelled      
+        Cancelled,
+        Disputed      
     }
 
     struct Offer {
@@ -89,6 +93,9 @@ contract OrderContract is ReentrancyGuard{
     event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash);
     event OrderConfirmed(address indexed user, uint64 indexed offerId, uint256 indexed amountPaid);
     event orderFinalized(address indexed user, uint64 indexed offerId);
+    event OrderProposedAnswer(address indexed agent, uint64 indexed offerId, bytes32 indexed answerHash);
+    event OrderDisputed(address indexed user, uint64 indexed offerId);
+    event OrderCancelled(address indexed user, uint64 indexed offerId);
    
 
     /*//////////////////////////////////////////////////////////////
@@ -202,6 +209,7 @@ contract OrderContract is ReentrancyGuard{
         offers[offerId].price = priceForOffer;
         offers[offerId].seller = seller;
         merchantOrderIds[seller].push(offerId);
+        emit OrderProposedAnswer(seller, offerId, answerHash);
     }
     
 
@@ -233,20 +241,20 @@ contract OrderContract is ReentrancyGuard{
      * @notice Cancel the order if enough time has passed since confirmation. Marks order as Cancelled. Only user who proposed and confirmed the order can cancel it.
      * @param offerId The ID of the offer to cancel
      */
-    function cancelOrder(uint64 offerId) external nonReentrant onlyUserWithOffer(offerId) {
-        if (block.timestamp - offers[offerId].timestamp < HOLD_UNTIL) {
-            revert OrderContract__EnoughTimeHasNotPassed();
-        }
-        if (offers[offerId].status != OrderStatus.Confirmed) {
-            revert OrderContract__OrderCannotBeCanceledInCurrentState();
-        }
-        // offerIdToStatus[offerId] = OrderStatus.Cancelled;
-        offers[offerId].status = OrderStatus.Cancelled;
-        bool success = ERC20(i_pyUSD).transfer(msg.sender, offers[offerId].paid);
-        if (!success) {
-            revert OrderContract__ERC20TransferFailed();
-        }
-    }
+    // function cancelOrder(uint64 offerId) external nonReentrant onlyUserWithOffer(offerId) {
+    //    if (block.timestamp - offers[offerId].timestamp < HOLD_UNTIL) {
+    //        revert OrderContract__EnoughTimeHasNotPassed();
+    //    }
+    //    if (offers[offerId].status != OrderStatus.Confirmed) {
+    //        revert OrderContract__OrderCannotBeCanceledInCurrentState();
+    //    }
+    //    // offerIdToStatus[offerId] = OrderStatus.Cancelled;
+    //    offers[offerId].status = OrderStatus.Cancelled;
+    //    bool success = ERC20(i_pyUSD).transfer(msg.sender, offers[offerId].paid);
+    //    if (!success) {
+    //        revert OrderContract__ERC20TransferFailed();
+    //    }
+    //}
 
 
     /**
@@ -264,6 +272,40 @@ contract OrderContract is ReentrancyGuard{
             revert OrderContract__ERC20TransferFailed();
         }
         A3AToken(i_a3aToken).mint(msg.sender, (PyUsdAmount*ADDITIONAL_PRECISION)*100);
+    }
+
+
+    function raiseDispute(uint64 offerId) external onlyUserWithOffer(offerId) {
+        if (offers[offerId].status != OrderStatus.Confirmed) {
+            revert OrderContract__OrderCannotBeFinalizedInCurrentState();
+        }
+        offers[offerId].status = OrderStatus.Disputed;
+        emit OrderDisputed(msg.sender, offerId);
+        
+    }
+
+    function ownerCancelOrder(uint64 offerId) external onlyOwner {
+        if (offers[offerId].status != OrderStatus.Disputed) {
+            revert OrderContract__OrderCannotBeDisputedInCurrentState();
+        }
+        offers[offerId].status = OrderStatus.Cancelled;
+        bool success = ERC20(i_pyUSD).transfer(offers[offerId].buyer, offers[offerId].paid);
+        if (!success) {
+            revert OrderContract__ERC20TransferFailed();
+        }
+        emit OrderCancelled(offers[offerId].buyer, offerId);
+    }
+
+    function ownerFinalizeOrder(uint64 offerId) external onlyOwner {
+        if (offers[offerId].status != OrderStatus.Disputed) {
+            revert OrderContract__OrderCannotBeDisputedInCurrentState();
+        }
+        offers[offerId].status = OrderStatus.Completed;
+        bool success = ERC20(i_pyUSD).transfer(offers[offerId].seller, offers[offerId].paid);
+        if (!success) {
+            revert OrderContract__ERC20TransferFailed();
+        }
+        emit orderFinalized(offers[offerId].buyer, offerId);
     }
 
 

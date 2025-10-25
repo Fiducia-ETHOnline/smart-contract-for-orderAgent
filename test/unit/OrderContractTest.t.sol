@@ -34,7 +34,9 @@ contract OrderContractTest is Test {
 
     event OrderProposed(address indexed user, uint64 indexed offerId, bytes32 indexed promptHash);
     event OrderConfirmed(address indexed user, uint64 indexed offerId, uint256 indexed amountPaid);
-
+    event OrderDisputed(address indexed user, uint64 indexed offerId);
+    event OrderCancelled(address indexed user, uint64 indexed offerId);
+    event orderFinalized(address indexed user, uint64 indexed offerId);
 
     function setUp() public {
         DeployOrderContract deployer = new DeployOrderContract();
@@ -469,22 +471,103 @@ contract OrderContractTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                           CANCEL ORDER TESTS
+                          RAISE DISPUTE TESTS
     //////////////////////////////////////////////////////////////*/
-    function testCancelOrderUpdatesState() public orderConfirmed {
+    function testUserCanDisputeWhenOrderConfirmed() public orderConfirmed {
         // Arrange
-        uint256 userBalanceBefore = ERC20Mock(pyUSD).balanceOf(USER);
         uint64 offerId = 1;
-        vm.warp(block.timestamp + 700);
-        vm.roll(1); // Move time forward to allow cancellation
         // Act
         vm.prank(USER);
-        orderContract.cancelOrder(offerId);
+        orderContract.raiseDispute(offerId);
         // Assert
-        uint256 userBalanceAfter = ERC20Mock(pyUSD).balanceOf(USER);
         OrderContract.OrderStatus status = orderContract.getOfferStatus(offerId);
-        assertEq(userBalanceAfter - userBalanceBefore, orderContract.getAmountPaid(offerId));
+        assertEq(uint8(status), uint8(OrderContract.OrderStatus.Disputed));
+    
+    }
+
+    function testRaiseDisputeEmitsEvent() public orderConfirmed {
+        // Arrange
+        uint64 offerId = 1;
+        // Act
+        vm.prank(USER);
+        vm.expectEmit(true, true, false, false, address(orderContract));
+        emit OrderDisputed(USER, offerId);
+        orderContract.raiseDispute(offerId);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           OWNER CANCEL TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testOwnerCanCancelDisputedOrder() public orderConfirmed {
+        // Arrange
+        uint64 offerId = 1;
+        // Act
+        uint256 userBalanceBefore = ERC20Mock(pyUSD).balanceOf(USER);
+        vm.prank(USER);
+        orderContract.raiseDispute(offerId);
+        vm.prank(owner);
+        orderContract.ownerCancelOrder(offerId);
+        uint256 userBalanceAfter = ERC20Mock(pyUSD).balanceOf(USER);
+        // Assert
+        OrderContract.OrderStatus status = orderContract.getOfferStatus(offerId);
         assertEq(uint8(status), uint8(OrderContract.OrderStatus.Cancelled));
+        assertEq(userBalanceAfter - userBalanceBefore, orderContract.getAmountPaid(offerId));
+    }
+
+    function testOwnerCancelEmitsEvent() public orderConfirmed {
+        // Arrange
+        uint64 offerId = 1;
+        // Act
+        vm.prank(USER);
+        orderContract.raiseDispute(offerId);
+        vm.prank(owner);
+        vm.expectEmit(true, true, false, false, address(orderContract));
+        emit OrderCancelled(USER, offerId);
+        orderContract.ownerCancelOrder(offerId);
+    }
+
+    function testOwnerCanOnlyCancelDisputedOrders() public orderConfirmed {
+        // Arrange
+        uint64 offerId = 1;
+        vm.prank(USER);
+        orderContract.raiseDispute(offerId);   
+        // Act / Assert
+        vm.prank(USER);
+        vm.expectRevert(OrderContract.OrderContract__onlyOwnerCanWithdrawFunds.selector);
+        orderContract.ownerCancelOrder(offerId);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                       OWNER FINALIZE ORDER TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testOwnerCanFinalizeDisputedOrder() public orderConfirmed {
+        // Arrange
+        uint64 offerId = 1;
+        uint256 sellerBalanceBefore = ERC20Mock(pyUSD).balanceOf(SELLER);
+        // Act
+        vm.prank(USER);
+        orderContract.raiseDispute(offerId);
+        vm.prank(owner);
+        orderContract.ownerFinalizeOrder(offerId);
+        uint256 sellerBalanceAfter = ERC20Mock(pyUSD).balanceOf(SELLER);
+        // Assert
+        OrderContract.OrderStatus status = orderContract.getOfferStatus(offerId);
+        assertEq(uint8(status), uint8(OrderContract.OrderStatus.Completed));
+        assertEq(sellerBalanceAfter - sellerBalanceBefore, orderContract.getAmountPaid(offerId));
+    }
+
+    function testOwnerFinalizeEmitsEvent() public orderConfirmed {
+        // Arrange
+        uint64 offerId = 1;
+        // Act
+        vm.prank(USER);
+        orderContract.raiseDispute(offerId);
+        vm.prank(owner);
+        vm.expectEmit(true, true, false, false, address(orderContract));
+        emit orderFinalized(USER, offerId);
+        orderContract.ownerFinalizeOrder(offerId);
     }
 
 
