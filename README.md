@@ -58,14 +58,6 @@ Funds escrowed in pyUSD + A3A burn
 Merchant paid on finalizeOrder()
 ```
 
----
-
-## 💡 Why the Order Agent Calls `proposeOrderAnswer()`
-
-In this MVP, **the Order Agent (AI controller)** — not the merchant — calls `proposeOrderAnswer()`.
-This design ensures that **only validated answers** are posted on-chain, preventing fake or low-quality submissions and removing the need for on-chain dispute resolution.
-
-> ⚖️ *The controller acts as a trusted validator between the AI system and the blockchain.*
 
 ---
 
@@ -137,14 +129,6 @@ forge test -vv
 * Strict caller checks (`onlyAgentController`, `onlyOwner`, etc.)
 * Verified pyUSD transfers with revert protection
 * Refund lock period (`HOLD_UNTIL`) before cancellation
-* **Centralized validation (MVP)** for safety — decentralized reputation coming soon
-
----
-
-## 🛣️ Roadmap
-
-* ✅ **MVP** — AI agent validates & executes full on-chain flow
-* 🔜 **Merchant autonomy** — allow MerchantNft holders to post answers
 
 ---
 
