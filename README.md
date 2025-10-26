@@ -13,7 +13,7 @@ Orders, validation, and settlement all happen transparently on-chain — powered
 >
 > OrderContract Sepolia:  0xa39aE8c1B35314FfafA9fF294637754F281F0875
 >
-> MerchantNft Sepolia: 0xe2d8c380db7d124D03DACcA07645Fea659De9738
+> MerchantNft Sepolia: 0x1e08cFBd659436F8Fc72C91A9302B6C6F444c0A2
 >
 > A3AToken Sepolia: 0x307Fea2981Ed87F37E96b96Fad40e8052942d99F
 
